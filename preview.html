@@ -557,6 +557,7 @@ function unrollStencil(){ return new Promise(res=>{ const dur=760, t0=performanc
       ctx.save(); ctx.translate(0,revY-curl/2);
       const gr=ctx.createLinearGradient(0,-curl/2,0,curl/2); gr.addColorStop(0,'#efe9dc'); gr.addColorStop(.5,'#d8d0c0'); gr.addColorStop(1,'#b9b09c');
       ctx.fillStyle=gr; roundRect(ctx,-12,-curl/2,W+24,curl,curl/2); ctx.fill();
+      if(paperTexImg){ ctx.save(); roundRect(ctx,-12,-curl/2,W+24,curl,curl/2); ctx.clip(); ctx.globalCompositeOperation='multiply'; ctx.globalAlpha=0.6; ctx.drawImage(paperTexImg,-12,-curl/2,W+24,curl); ctx.globalAlpha=1; ctx.restore(); }   // same paper grain on the roll
       ctx.fillStyle='rgba(0,0,0,.10)'; ctx.fillRect(0,curl/2,W,10); ctx.restore();
     }
     ctx.restore();
@@ -914,6 +915,7 @@ function render(now){
       ctx.fillStyle='rgba(0,0,0,.16)'; roundRect(ctx,-12,curl/2-6,W+24,16,8); ctx.fill();   // soft shadow cast onto the revealed drawing below
       const gr=ctx.createLinearGradient(0,-curl/2,0,curl/2); gr.addColorStop(0,'#c7bc9c'); gr.addColorStop(.5,'#ece3c8'); gr.addColorStop(1,'#b3a684');
       ctx.fillStyle=gr; roundRect(ctx,-12,-curl/2,W+24,curl,curl/2); ctx.fill();
+      if(paperTexImg){ ctx.save(); roundRect(ctx,-12,-curl/2,W+24,curl,curl/2); ctx.clip(); ctx.globalCompositeOperation='multiply'; ctx.globalAlpha=0.6; ctx.drawImage(paperTexImg,-12,-curl/2,W+24,curl); ctx.globalAlpha=1; ctx.restore(); }   // same paper grain on the roll
       ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,-curl/2+3); ctx.lineTo(W,-curl/2+3); ctx.stroke();   // crest highlight
       ctx.restore();
     }
