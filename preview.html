@@ -1082,11 +1082,17 @@ function showResult(acc){
   const praise = acc>=95?'Beautiful work!' : acc>=85?'Lovely colouring!' : acc>=80?'Nicely done!' : 'Almost there!';
   const draw=`<div class="rdraw pop"><img src="${pic}"></div>`;
   // buttons by accuracy: ≥80 -> NEXT ; <100 -> RETRY ; SKETCHBOOK always (disabled/grey when nothing collected yet)
+  const galBtn = `<button class="btn book${hasGallery?'':' disabled'}" id="gal">SKETCHBOOK</button>`;
   let btns='';
-  if(cleared) btns += `<button class="btn primary" id="nx">NEXT</button>`;                         // art-tone coloured primary
-  btns += `<button class="btn book${hasGallery?'':' disabled'}" id="gal">SKETCHBOOK</button>`;       // paper
-  if(acc<100)  btns += `<button class="btn retry" id="rt">RETRY</button>`;                            // underlined text only, at the bottom
-  sfx(cleared?'win':'fail'); if(navigator.vibrate)navigator.vibrate([20,40,20,40,40]); p.className='panel'+(assets.sketchPopup?' sketch':''); launchConfetti(acc>=85);
+  if(cleared){                                                  // >=80%: advance is the main action
+    btns += `<button class="btn primary" id="nx">NEXT</button>`;     // art-tone coloured primary
+    btns += galBtn;                                                  // paper
+    if(acc<100) btns += `<button class="btn retry" id="rt">RETRY</button>`;   // optional underlined text at the bottom
+  } else {                                                      // <80%: RETRY is the main action (coloured, on top); no text retry
+    btns += `<button class="btn primary" id="rt">RETRY</button>`;
+    btns += galBtn;
+  }
+  sfx(cleared?'win':'fail'); if(navigator.vibrate)navigator.vibrate([20,40,20,40,40]); p.className='panel'+(assets.sketchPopup?' sketch':''); if(cleared)launchConfetti(acc>=95);   // celebrate only when cleared (>=80%)
   p.innerHTML=`${draw}<div class="praise">${praise}</div><p class="score">ACCURACY ${acc}%</p><div class="btns">${btns}</div>`;
   $('#overlay').classList.add('show');
   const nx=$('#nx'); if(nx) nx.onclick=()=>{ if(STAGE.next)location.href=STAGE.next; else location.reload(); };
