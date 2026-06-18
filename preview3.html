@@ -11,10 +11,9 @@
   #stageWrap{position:fixed;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;}
   #stage{position:relative;width:1080px;height:1920px;flex:none;transform-origin:center center;}
   /* top bar */
-  #topbar{position:absolute;top:54px;left:0;width:100%;height:110px;display:flex;align-items:center;justify-content:center;z-index:25;}
-  #prog{box-sizing:border-box;position:relative;width:660px;height:74px;background:#fbf3e1;border:7px solid #aedfca;border-radius:40px;box-shadow:0 6px 10px rgba(60,80,80,.2),inset 0 3px 5px rgba(120,100,70,.08);}
-  #progClip{position:absolute;top:4px;left:4px;height:calc(100% - 8px);width:0;overflow:hidden;border-radius:30px;transition:width .4s cubic-bezier(.2,.85,.25,1);}
-  #progFill{height:100%;width:638px;border-radius:30px;background:linear-gradient(180deg,#aef0d0 0%,#63cd9f 55%,#56c294 100%);box-shadow:inset 0 2px 2px rgba(255,255,255,.55),inset 0 -2px 3px rgba(0,0,0,.06);}
+  #starbar{position:absolute;top:46px;left:0;width:100%;height:96px;display:flex;align-items:center;justify-content:center;gap:16px;z-index:25;}
+  #starbar img{width:84px;height:84px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.18));transition:filter .25s ease, transform .3s cubic-bezier(.3,.7,.3,1.4);}
+  #starbar img.off{filter:grayscale(1) brightness(1.35) opacity(.4);transform:scale(.78);}
   /* per-placement rating image popup */
   #rating{position:absolute;left:50%;top:540px;transform:translate(-50%,-50%) scale(.5);opacity:0;z-index:42;pointer-events:none;}
   #rating.show{animation:ratePop .9s ease forwards;}
@@ -46,15 +45,15 @@
   .ttile{position:relative;width:246px;height:234px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s ease;-webkit-tap-highlight-color:transparent;}
   .ttile:active{transform:scale(.94);}
   .ttile img{max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 12px 18px rgba(40,60,60,.34));pointer-events:none;}
-  .ttile::after{content:'';position:absolute;inset:8px;border-radius:24px;background:#ea4d42;opacity:0;pointer-events:none;}   /* red "wrong" wash */
+  .ttile .redov{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;filter:none;}   /* red "wrong" overlay — exact tile footprint */
   .ttile.reject{z-index:30;animation:tileReject .72s cubic-bezier(.3,.7,.3,1);}
-  .ttile.reject::after{animation:redFlash .72s ease;}
+  .ttile.reject .redov{animation:redFlash .72s ease;}
   @keyframes tileReject{0%{transform:translateY(0) scale(1);}28%{transform:translateY(-56px) scale(1.05) rotate(-1.5deg);}60%{transform:translateY(-56px) scale(1.05) rotate(1.5deg);}100%{transform:translateY(0) scale(1);}}   /* rise -> hold -> fall */
   @keyframes redFlash{0%,28%{opacity:0;}45%{opacity:.74;}74%{opacity:.74;}100%{opacity:0;}}
-  #msgToast{position:fixed;left:50%;top:57%;transform:translate(-50%,-50%) scale(.8);z-index:64;pointer-events:none;opacity:0;}
-  #msgToast img{width:440px;height:auto;filter:drop-shadow(0 12px 22px rgba(0,0,0,.26));}
-  #msgToast.show{animation:msgPop 1.4s ease forwards;}
-  @keyframes msgPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.8);}12%{opacity:1;transform:translate(-50%,-58%) scale(1.06);}22%{transform:translate(-50%,-60%) scale(1);}78%{opacity:1;transform:translate(-50%,-62%) scale(1);}100%{opacity:0;transform:translate(-50%,-70%) scale(.95);}}
+  #msgToast{position:fixed;left:50%;top:50%;z-index:64;pointer-events:none;opacity:0;transform:translate(-50%,-100%) scale(.8);}   /* JS sets left/top to just above the wrong tile */
+  #msgToast img{width:182px;height:auto;filter:drop-shadow(0 8px 14px rgba(0,0,0,.24));}
+  #msgToast.show{animation:msgPop 1.3s ease forwards;}
+  @keyframes msgPop{0%{opacity:0;transform:translate(-50%,-86%) scale(.7);}16%{opacity:1;transform:translate(-50%,-110%) scale(1.06);}28%{transform:translate(-50%,-104%) scale(1);}74%{opacity:1;transform:translate(-50%,-106%) scale(1);}100%{opacity:0;transform:translate(-50%,-118%) scale(.95);}}
   .stars{display:flex;justify-content:center;gap:16px;margin:4px 0 16px;}
   .stars img{width:100px;height:100px;}
   .stars img.off{filter:grayscale(1) brightness(1.3) opacity(.42);}
@@ -103,7 +102,7 @@
 <body>
 <div id="bgfill"></div>
 <div id="stageWrap"><div id="stage">
-  <div id="topbar"><div id="prog"><div id="progClip"><div id="progFill"></div></div></div></div>
+  <div id="starbar"><img alt=""><img alt=""><img alt=""></div>
   <div id="field">
     <img id="paper" alt="">
     <canvas id="play"></canvas>
@@ -196,7 +195,7 @@ function sfx(k){ if(A[k]){try{A[k].currentTime=0;A[k].play().catch(()=>{});}catc
   targetImg=await loadImg(assets.target||STAGE.targetImage);
   if(targetImg)targetCtx.drawImage(targetImg,0,0,W,H);
   for(const s of stencils){ maskImgs[s.seq]=await loadImg((assets.masks&&assets.masks[s.mask])||s.mask); }
-  initAudio(); computeTiles(); buildCarousel(); updateProgress(); fitScale(); sizeDragLayer(); sizeConfetti();
+  initAudio(); computeTiles(); buildCarousel(); updateStars(); fitScale(); sizeDragLayer(); sizeConfetti();
   window.addEventListener('resize',()=>{ fitScale(); sizeDragLayer(); sizeConfetti(); });
   state='idle';
   DIFF = STAGE.difficulty || (stencils.length>=6?'hard':(stencils.length>=5?'medium':'easy'));
@@ -205,9 +204,9 @@ function sfx(k){ if(A[k]){try{A[k].currentTime=0;A[k].play().catch(()=>{});}catc
   ensureDraw();
 })();
 let DIFF='medium', stageStart=0;
-// top progress bar: used stencils / total
-function updateProgress(){ const total=stencils.length, used=stencils.filter(s=>s.used).length;
-  const clip=$('#progClip'); if(clip) clip.style.width=(638*used/total)+'px'; }
+// top star bar: start at 3, drop one per mistake (min 1) — mirrors the result score
+function updateStars(){ const cur=Math.max(1, 3-mistakes);
+  document.querySelectorAll('#starbar img').forEach((im,i)=>{ if(assets.starFull && !im.src) im.src=assets.starFull; im.classList.toggle('off', i>=cur); }); }
 // per-placement rating image (PERFECT / EXCELLENT / GOOD / MISS). MISS only happens from the 2nd stencil
 // (the first stencil sets pictureOrigin so its delta is always 0 -> PERFECT).
 let pictureOrigin=null;
@@ -256,6 +255,9 @@ function computeTiles(){
     s.tile=cv; s.tileURL=cv.toDataURL();
     const dcv=document.createElement('canvas'); dcv.width=bw; dcv.height=bh; mk(dcv.getContext('2d'),0.85);   // drag/field sheet (rendered translucent, so a stronger tint)
     s.dragSheet=dcv;
+    // red "wrong" overlay: SAME canvas size + SAME corner radius (22) as the sheet -> overlays the tile exactly
+    const rcv=document.createElement('canvas'); rcv.width=bw; rcv.height=bh; const rcx=rcv.getContext('2d');
+    rcx.fillStyle='#ea4d42'; roundRect(rcx,0,0,bw,bh,22); rcx.fill(); s.tileRedURL=rcv.toDataURL();
   }
 }
 // ---------- tap-to-place TRAY: tap a stencil; it auto-places at its correct spot IF the order is valid ----------
@@ -266,6 +268,7 @@ function buildCarousel(){   // (name kept) rebuild the tray of remaining stencil
   carItems.forEach(s=>{
     const el=document.createElement('div'); el.className='ttile';
     const im=new Image(); im.src=s.tileURL; el.appendChild(im); s.el=el;
+    const rv=new Image(); rv.className='redov'; rv.src=s.tileRedURL; el.appendChild(rv);   // red wrong-overlay, exact same footprint
     el.addEventListener('click',()=>tryPlace(s));
     q.appendChild(el);
   });
@@ -278,13 +281,15 @@ function tryPlace(s){
   placeStencil(s,{x:0,y:0});                        // auto-place at the correct position
 }
 function rejectTile(s){
-  mistakes++;
+  mistakes++; updateStars();
   if(s.el){ s.el.classList.remove('reject'); void s.el.offsetWidth; s.el.classList.add('reject'); }   // rise -> turn red -> fall
-  showWrongToast();
+  showWrongToast(s);
   if(navigator.vibrate)navigator.vibrate([10,45,10]);
 }
 let _msgTmr=null;
-function showWrongToast(){ const t=$('#msgToast'),i=$('#msgImg'); if(!t)return; if(i&&assets.toastWrong)i.src=assets.toastWrong; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); clearTimeout(_msgTmr); _msgTmr=setTimeout(()=>t.classList.remove('show'),1500); }
+function showWrongToast(s){ const t=$('#msgToast'),i=$('#msgImg'); if(!t)return; if(i&&assets.toastWrong)i.src=assets.toastWrong;
+  if(s&&s.el){ const r=s.el.getBoundingClientRect(); t.style.left=(r.left+r.width/2)+'px'; t.style.top=(r.top-2)+'px'; }   // small, just above the wrong tile
+  t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); clearTimeout(_msgTmr); _msgTmr=setTimeout(()=>t.classList.remove('show'),1400); }
 
 // ---------- floating drag: tile lifts ABOVE the finger, visible anywhere; snaps to the grid over the field ----------
 const dragLayer=$('#dragLayer'), dlx=dragLayer.getContext('2d');
@@ -379,7 +384,7 @@ function placeStencil(s,offset){
   sfx('chak'); if(navigator.vibrate)navigator.vibrate(16);
   startSpray();   // dragged into place already -> straight to spray (no extra drop animation)
   // advance the queue NOW (don't wait for spray/peel): this stencil leaves, the next centres+enlarges & is grabbable
-  s.used=true; buildCarousel(); updateProgress();
+  s.used=true; buildCarousel(); updateStars();
 }
 async function layStencil(){
   const x0=active.home.x+placeOffset.x, y0=active.home.y+placeOffset.y, bw=active.box.w, bh=active.box.h, cx=x0+bw/2, cy=y0+bh/2;
@@ -722,7 +727,7 @@ let rseed=1; function rand(){ rseed=(rseed*1103515245+12345)&0x7fffffff; return 
 function showResult(){
   state='judging';
   // picture is always correct (auto-placed + order-gated) -> score = ORDER skill, by mistakes (wrong taps)
-  const p=$('#popup'), stars = mistakes===0?3:(mistakes<=2?2:1), perfect = stars===3;
+  const p=$('#popup'), stars = Math.max(1, 3-mistakes), perfect = stars===3;
   rseed=(stageStart|0)+mistakes+stencils.length;   // vary praise per play
   const nextBtn = `<button class="btn" id="nx">${STAGE.next?'NEXT STAGE':'DONE'}</button>`;
   const retryBtn = `<button class="btn alt" id="rt">RETRY</button>`;
