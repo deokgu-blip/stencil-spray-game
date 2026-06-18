@@ -26,6 +26,9 @@
     text-shadow:0 4px 0 rgba(255,255,255,.85),0 9px 0 rgba(0,0,0,.12),0 14px 18px rgba(0,0,0,.28);}
   #stepRate.show .rletter{animation:rboing .52s cubic-bezier(.2,1.5,.4,1) forwards;}
   @keyframes rboing{0%{opacity:0;transform:translateY(34px) scale(.25) rotate(-10deg);}55%{opacity:1;transform:translateY(-14px) scale(1.28) rotate(4deg);}100%{opacity:1;transform:translateY(0) scale(1) rotate(0);}}
+  #tapHint{display:none;position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:60;pointer-events:none;font-size:54px;font-weight:700;color:#5b7b86;text-shadow:0 2px 0 rgba(255,255,255,.7);white-space:nowrap;}
+  #tapHint.show{animation:tapPulse 1.1s ease-in-out infinite;}
+  @keyframes tapPulse{0%,100%{opacity:.55;transform:translateX(-50%) scale(.97);}50%{opacity:1;transform:translateX(-50%) scale(1.04);}}
   /* easel stand behind the tall canvas (legs splay out below the canvas) */
   #easel{position:absolute;left:50%;top:-344px;transform:translateX(-50%);width:1287px;height:auto;z-index:0;pointer-events:none;filter:drop-shadow(0 22px 26px rgba(40,60,60,.24));}
   /* tall PORTRAIT drawing paper resting on the easel — solid white, height follows the canvas aspect */
@@ -172,6 +175,7 @@
 </div>
 <div id="msgToast"><img id="msgImg" alt=""></div>
 <div id="stepRate"></div>
+<div id="tapHint">Tap to start ✨</div>
 <div id="overlay"><div class="panel" id="popup"></div></div>
 <button id="bookBtn" title="sketchbook">📒</button>
 <div id="gallery"><div id="galHead">SKETCHBOOK</div><div id="ggrid"></div><button id="galBack">←</button></div>
@@ -578,10 +582,15 @@ function runEntry(){ return new Promise(async res=>{
   await wait(740);
   if(refBox){ refBox.style.transition='opacity .25s'; refBox.style.opacity='1'; }
   g.remove();
-  await wait(750);            // hold on the empty WHITE paper so a first-time player sees the blank canvas...
+  await wait(400);            // hold on the empty WHITE paper so a first-time player sees the blank canvas...
+  await waitForTap();         // ...wait for the first TAP (unlocks audio so the very first unroll plays its sound)
   await unrollStencil();      // ...then the beige stencil rolls down from the top
   res();
 }); }
+// show a gentle "Tap to start" and resolve on the first pointer-down (also unlocks audio for the entry sound)
+function waitForTap(){ return new Promise(res=>{ const h=$('#tapHint'); if(h){h.style.display='block'; h.classList.add('show');}
+  let done=false; const fin=()=>{ if(done)return; done=true; clearTimeout(to); window.removeEventListener('pointerdown',fin,true); if(h){h.classList.remove('show'); h.style.display='none';} res(); };
+  window.addEventListener('pointerdown',fin,true); const to=setTimeout(fin,6000); }); }
 function unrollStencil(){ return new Promise(res=>{ const dur=760, t0=performance.now();
   if(A.unroll){ try{ A.unroll.currentTime=0; A.unroll.volume=0.55; A.unroll.play().catch(()=>{}); }catch(e){} }   // paper unroll/lay sound
   (function st(){ const k=Math.min(1,(performance.now()-t0)/dur), e=1-(1-k)*(1-k); window.__uK=k;
