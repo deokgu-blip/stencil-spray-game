@@ -36,21 +36,25 @@
   #refBox .rlab{position:absolute;top:5px;left:0;width:100%;text-align:center;font-size:13px;font-weight:800;color:#7f9098;z-index:2;}
   #refPin{position:absolute;top:-27px;left:50%;transform:translateX(-50%);width:60px;height:60px;z-index:3;filter:drop-shadow(0 6px 7px rgba(0,0,0,.28));pointer-events:none;}
   #refBox.zoom{transform:rotate(0deg) scale(3.2);box-shadow:0 26px 60px rgba(0,0,0,.4);cursor:zoom-out;}
-  /* bottom panel: per-colour spray CANS + 5 spray-width buttons */
-  #bottom{position:absolute;top:1235px;left:0;width:100%;height:685px;z-index:5;display:flex;flex-direction:column;align-items:center;gap:16px;padding-top:8px;}
-  #canHint{font-size:28px;font-weight:800;color:#5b7b86;opacity:.92;text-align:center;height:34px;}
-  #cans{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-end;padding:0 24px;max-width:1040px;}
-  .can{position:relative;width:138px;height:232px;display:flex;align-items:flex-end;justify-content:center;cursor:pointer;transition:transform .14s cubic-bezier(.3,.8,.3,1);}
-  .can:active{transform:scale(.92);}
+  /* bottom panel: spray-can CAROUSEL + spray-width SLIDER with live preview */
+  #bottom{position:absolute;top:1212px;left:0;width:100%;height:708px;z-index:5;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:6px;}
+  #canHint{font-size:27px;font-weight:800;color:#5b7b86;opacity:.92;text-align:center;height:32px;}
+  /* CAROUSEL — swipe/drag horizontally, tap to select; centred can is emphasised */
+  #cans{position:relative;width:100%;height:234px;overflow:hidden;cursor:grab;}
+  #cans:active{cursor:grabbing;}
+  #canTrack{position:absolute;left:50%;top:6px;height:222px;display:flex;align-items:center;will-change:transform;}
+  .can{flex:0 0 150px;height:222px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transform:scale(.7);transition:transform .2s cubic-bezier(.3,.85,.3,1),opacity .2s;}
   .can img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 10px 14px rgba(40,60,60,.3));pointer-events:none;}
-  .can.sel{transform:translateY(-16px) scale(1.06);}
-  .can.want img{animation:canBob 1.2s ease-in-out infinite;}
-  @keyframes canBob{0%,100%{transform:translateY(0);}50%{transform:translateY(-14px);}}
-  #widths{display:flex;gap:16px;justify-content:center;align-items:center;}
-  .wbtn{width:104px;height:104px;border-radius:26px;background:#fffdf5;box-shadow:0 6px 12px rgba(40,60,60,.2);display:flex;align-items:center;justify-content:center;cursor:pointer;border:5px solid transparent;transition:transform .1s;}
-  .wbtn:active{transform:scale(.9);}
-  .wbtn.sel{border-color:#43c08e;background:#eafaf3;}
-  .wbtn .dot{border-radius:50%;background:#6b8893;}
+  .can.sel{opacity:1;transform:scale(1.14);}
+  /* WIDTH SLIDER + live preview circle */
+  #widths{display:flex;flex-direction:column;align-items:center;gap:12px;width:100%;}
+  #wprev{height:184px;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+  #wcirc{border-radius:50%;box-shadow:0 6px 16px rgba(40,60,60,.28),inset 0 5px 12px rgba(255,255,255,.4);border:3px solid rgba(255,255,255,.7);}
+  #wslider{-webkit-appearance:none;appearance:none;width:620px;max-width:80%;height:26px;border-radius:14px;background:linear-gradient(90deg,#d3e7e0,#7fceb4);outline:none;cursor:pointer;}
+  #wslider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:60px;height:60px;border-radius:50%;background:#fffdf5;border:5px solid #43c08e;box-shadow:0 5px 12px rgba(0,0,0,.28);cursor:pointer;}
+  #wslider::-moz-range-thumb{width:60px;height:60px;border-radius:50%;background:#fffdf5;border:5px solid #43c08e;box-shadow:0 5px 12px rgba(0,0,0,.28);cursor:pointer;}
+  #doneBtn{display:none;margin-top:6px;padding:26px 86px;border:none;border-radius:44px;font-size:46px;font-weight:900;letter-spacing:1px;color:#fff;background:linear-gradient(180deg,#5fd0a0,#33a87e);box-shadow:0 12px 0 #237a61,0 18px 26px rgba(40,90,70,.34);cursor:pointer;transition:transform .1s;}
+  #doneBtn:active{transform:translateY(7px);box-shadow:0 5px 0 #237a61,0 8px 14px rgba(40,90,70,.3);}
   #msgToast{position:fixed;left:50%;top:50%;z-index:64;pointer-events:none;opacity:0;transform:translate(-50%,-100%) scale(.8);}   /* JS sets left/top to just above the wrong tile */
   #msgToast img{width:182px;height:auto;filter:drop-shadow(0 8px 14px rgba(0,0,0,.24));}
   #msgToast.show{animation:msgPop 1.3s ease forwards;}
@@ -126,6 +130,7 @@
     <div id="canHint"></div>
     <div id="cans"></div>
     <div id="widths"></div>
+    <button id="doneBtn">COMPLETE</button>
   </div>
   <div id="hint"></div>
   <div id="rating"><img id="ratingImg" alt=""></div>
@@ -207,6 +212,7 @@ function sfx(k){ if(A[k]){try{A[k].currentTime=0;A[k].play().catch(()=>{});}catc
   if(assets.can2)$('#sprayCan').src=assets.can2;
   setupRefZoom();
   $('#bookBtn').onclick=openGallery; $('#galClose').onclick=()=>$('#gallery').classList.remove('show');
+  $('#doneBtn').onclick=onComplete;
   targetImg=await loadImg(assets.target||STAGE.targetImage);
   if(targetImg)targetCtx.drawImage(targetImg,0,0,W,H);
   for(const s of stencils){ maskImgs[s.seq]=await loadImg((assets.masks&&assets.masks[s.mask])||s.mask); }
@@ -214,7 +220,7 @@ function sfx(k){ if(A[k]){try{A[k].currentTime=0;A[k].play().catch(()=>{});}catc
   initAudio(); computeTiles(); buildBottom(); fitScale(); sizeDragLayer(); sizeConfetti();
   window.addEventListener('resize',()=>{ fitScale(); sizeDragLayer(); sizeConfetti(); });
   stageStart=performance.now();
-  layNext();   // auto-lay the first stencil; the player picks a can and rubs to fill
+  startColoring();   // single stencil = whole picture; player colours freely, then COMPLETE
 })();
 let DIFF='medium', stageStart=0;
 // top star bar: start at 3, drop one per mistake (min 1) — mirrors the result score
@@ -229,7 +235,7 @@ function showRating(deltaCells){
   if(!src) return;
   img.src=src; box.classList.remove('show'); void box.offsetWidth; box.classList.add('show');
 }
-function fitScale(){ const s=Math.min(window.innerWidth/1080,window.innerHeight/1920); $('#stage').style.transform=`scale(${s})`; document.documentElement.style.setProperty('--s',s); }
+function fitScale(){ const s=Math.min(window.innerWidth/1080,window.innerHeight/1920); scaleS=s; $('#stage').style.transform=`scale(${s})`; document.documentElement.style.setProperty('--s',s); }
 
 // ---------- precompute tiles — ALL stencils share ONE size = the whole picture's bbox (+margin) ----------
 function computeTiles(){
@@ -259,8 +265,7 @@ function computeTiles(){
       g.save(); roundRect(g,0,0,bw,bh,22); g.clip();
       g.globalAlpha=0.045; for(let i=0;i<240;i++){ g.fillStyle=(i&1)?'#000':'#a89e88'; g.fillRect(Math.random()*bw,Math.random()*bh,2,2);} g.globalAlpha=1;  // faint paper grain
       g.restore();
-      g.globalCompositeOperation='destination-out'; g.drawImage(maskImgs[s.seq], -home.x, -home.y, W, H); g.globalCompositeOperation='source-over';  // punch real holes
-      g.globalAlpha=tintA; g.drawImage(tintCv,0,0); g.globalAlpha=1;   // translucent colour preview in the holes
+      g.globalCompositeOperation='destination-out'; g.drawImage(maskImgs[s.seq], -home.x, -home.y, W, H); g.globalCompositeOperation='source-over';  // punch real holes (no colour preview — player chooses + fills)
       g.drawImage(holeRim(s.seq,home,bw,bh),0,0);   // dark inner rim -> holes clearly read as cut-outs
       sheetOutlineWhite(g,0,0,bw,bh);
     };
@@ -276,24 +281,60 @@ function computeTiles(){
 // ---------- bottom: colour spray CANS + 5 spray-WIDTH buttons. Stencils auto-lay; you rub to fill the holes. ----------
 let carItems=[], canBaseImg=null, maskArea90=1, spParts=[], lastFill=null, fingerDown=false, mistakes=0;
 const STAGE_COLORS=[...new Set(stencils.map(s=>s.color))];
-let selColor=null, brushLv=2;
-const WIDTHS=[0.42,0.66,1.0,1.5,2.2].map(m=>Math.max(10,Math.round(SPRAY_R*m)));
-const brushR=()=>WIDTHS[brushLv];
+let selColor=null, peelOff=0;
+let linesCv=null, linesMaskCv=null, unionCv=null;       // thick dark divider/border lines + paintable mask
+const INNER_R=Math.round(W*0.009);                      // divider line half-width -> ~11px lines between colours
+const OUTER_R=Math.round(W*0.021);                      // outer border half-width -> ~25px, MUCH thicker frame
+let brushRadius=Math.round(SPRAY_R*1.0);                // spray width (slider-driven, canvas px)
+const BR_MIN=Math.round(SPRAY_R*0.36), BR_MAX=Math.round(SPRAY_R*2.1);
+const brushR=()=>brushRadius;
+let carIdx=0, carDragShift=0, scaleS=1;                 // spray-can carousel state
 const _canC={};
-function tintedCan(col){ if(_canC[col])return _canC[col]; const w=210,h=210,c=document.createElement('canvas'); c.width=w;c.height=h; const g=c.getContext('2d');
+function tintedCan(col){ if(_canC[col])return _canC[col]; const w=210,h=300,c=document.createElement('canvas'); c.width=w;c.height=h; const g=c.getContext('2d');
   if(canBaseImg){ const r=Math.min(w/canBaseImg.width,h/canBaseImg.height)*0.95, iw=canBaseImg.width*r, ih=canBaseImg.height*r; g.drawImage(canBaseImg,(w-iw)/2,(h-ih)/2,iw,ih);
     g.globalCompositeOperation='source-atop'; g.globalAlpha=0.8; g.fillStyle=col; g.fillRect(0,0,w,h); g.globalAlpha=1; g.globalCompositeOperation='source-over'; }
   else { g.fillStyle=col; roundRect(g,58,28,94,154,26); g.fill(); }
   return _canC[col]=c.toDataURL(); }
-function buildBottom(){
-  const cur=active?active.color:(nextStencil()&&nextStencil().color);
-  const cc=$('#cans'); if(cc){ cc.innerHTML=''; STAGE_COLORS.forEach(col=>{ const el=document.createElement('div'); el.className='can'+(col===selColor?' sel':'')+(col===cur&&col!==selColor?' want':'');
-    const im=new Image(); im.src=tintedCan(col); el.appendChild(im); el.onclick=()=>{ selColor=col; buildBottom(); }; cc.appendChild(el); }); }
-  const wc=$('#widths'); if(wc){ wc.innerHTML=''; WIDTHS.forEach((rw,i)=>{ const el=document.createElement('div'); el.className='wbtn'+(i===brushLv?' sel':'');
-    const dt=document.createElement('div'); dt.className='wdot'; const sz=9+i*6; dt.style.width=sz+'px'; dt.style.height=sz+'px'; el.appendChild(dt); el.onclick=()=>{ brushLv=i; buildBottom(); }; wc.appendChild(el); }); }
-  const h=$('#canHint'); if(h) h.textContent = state==='spraying' ? (selColor?'Rub the shape to fill it':'Pick a color, then rub to fill') : '';
+function buildBottom(){ buildCans(); buildWidth(); updateHint(); }
+// ---- spray-can CAROUSEL: swipe/drag to scroll, tap to select, centred can emphasised ----
+const CAN_SLOT=150;   // matches .can flex-basis (stage px)
+function buildCans(){
+  const vp=$('#cans'); if(!vp)return; vp.innerHTML='';
+  const track=document.createElement('div'); track.id='canTrack'; vp.appendChild(track);
+  STAGE_COLORS.forEach((col,i)=>{ const el=document.createElement('div'); el.className='can'; el.dataset.i=i;
+    const im=new Image(); im.src=tintedCan(col); el.appendChild(im); track.appendChild(el); });
+  layoutCans(); attachCarousel(vp,track);
 }
-function buildCarousel(){ buildBottom(); }   // alias (place/peel code calls buildCarousel)
+function layoutCans(){ const track=$('#canTrack'); if(!track)return;
+  [...track.children].forEach((el,i)=>el.classList.toggle('sel',i===carIdx));
+  track.style.transform='translateX('+(-carIdx*CAN_SLOT - CAN_SLOT/2 + carDragShift)+'px)'; }
+function selectCan(i){ carIdx=Math.max(0,Math.min(STAGE_COLORS.length-1,i)); selColor=STAGE_COLORS[carIdx]; carDragShift=0; layoutCans(); updateWcirc(); updateHint(); }
+function attachCarousel(vp,track){
+  let down=false,sx=0,moved=0;
+  vp.onpointerdown=e=>{ down=true; sx=e.clientX; moved=0; track.style.transition='none'; try{vp.setPointerCapture(e.pointerId);}catch(_){} };
+  vp.onpointermove=e=>{ if(!down)return; const dx=(e.clientX-sx)/(scaleS||1); moved=Math.max(moved,Math.abs(dx)); carDragShift=dx; layoutCans(); };
+  const end=e=>{ if(!down)return; down=false; track.style.transition='transform .22s cubic-bezier(.3,.85,.3,1)';
+    if(moved<10){ const el=(e.target&&e.target.closest)?e.target.closest('.can'):null; if(el)selectCan(+el.dataset.i); else {carDragShift=0;layoutCans();} }
+    else selectCan(carIdx + Math.round(-carDragShift/CAN_SLOT)); };
+  vp.onpointerup=end; vp.onpointercancel=end;
+}
+// ---- spray-WIDTH slider with a live, true-to-size preview circle ----
+function buildWidth(){
+  const wc=$('#widths'); if(!wc)return; wc.innerHTML='';
+  const prev=document.createElement('div'); prev.id='wprev'; const circ=document.createElement('div'); circ.id='wcirc'; prev.appendChild(circ);
+  const sl=document.createElement('input'); sl.type='range'; sl.id='wslider'; sl.min=BR_MIN; sl.max=BR_MAX; sl.step=1; sl.value=brushRadius;
+  sl.addEventListener('input',()=>{ brushRadius=+sl.value; updateWcirc(); });
+  wc.appendChild(prev); wc.appendChild(sl); updateWcirc();
+}
+function updateWcirc(){ const c=$('#wcirc'); if(!c)return;
+  const disp=$('#play'), playW=disp&&disp.clientWidth?disp.clientWidth:820;   // canvas display width (stage px)
+  const d=Math.max(22, brushRadius*2*(playW/W));                              // true-to-life brush diameter
+  c.style.width=d+'px'; c.style.height=d+'px';
+  c.style.background='radial-gradient(circle at 38% 32%, rgba(255,255,255,.55), rgba(255,255,255,0) 55%), '+(selColor||'#7fb0a0');
+}
+function updateHint(){ const h=$('#canHint'); if(!h)return;
+  h.textContent = state==='spraying' ? 'Spray freely — swipe the cans to switch colour, then COMPLETE' : ''; }
+function buildCarousel(){ buildBottom(); }   // alias (legacy callers)
 function fillDab(x,y){ const r=brushR(); sweepCtx.globalAlpha=0.92; sweepCtx.fillStyle=selColor; sweepCtx.beginPath(); sweepCtx.arc(x,y,r,0,7); sweepCtx.fill(); sweepCtx.globalAlpha=1;
   for(let i=0;i<4;i++){ const a=Math.random()*7, sp=1+Math.random()*4; spParts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:1,c:selColor}); } }
 function fillSpray(x,y){ if(!selColor||state!=='spraying')return; if(!nozzle.show){nozzle.show=true; loopOn(A.spray,0.5); setHint('');} fillDab(x,y); lastFill={x,y}; nozzle.x=x;nozzle.y=y; ensureDraw(); }
@@ -305,6 +346,99 @@ playCv.addEventListener('pointerdown',e=>{ if(state!=='spraying')return; e.preve
 playCv.addEventListener('pointermove',e=>{ if(!fingerDown||state!=='spraying')return; const p=playPos(e); fillStroke(p.x,p.y); });
 window.addEventListener('pointerup',()=>{ fingerDown=false; lastFill=null; if(nozzle.show){nozzle.show=false; loopOff(A.spray);} });
 function layNext(){ const s=nextStencil(); if(!s){ state='review'; runReview(); return; } placeStencil(s,{x:0,y:0}); }
+// ---------- SINGLE-stencil spray-colouring: one sheet = whole picture; colour freely; COMPLETE -> peel + accuracy ----------
+// square morphological ops via offset draws (cheap; run once at stage start)
+function morphCv(){ const c=document.createElement('canvas'); c.width=W;c.height=H; return c; }
+function dilateCv(src,R){ const h=morphCv(),hg=h.getContext('2d'); for(let dx=-R;dx<=R;dx++)hg.drawImage(src,dx,0);
+  const v=morphCv(),vg=v.getContext('2d'); for(let dy=-R;dy<=R;dy++)vg.drawImage(h,0,dy); return v; }
+function paintShape(dst,shapeCv,col){ const t=morphCv(),tg=t.getContext('2d'); tg.drawImage(shapeCv,0,0); tg.globalCompositeOperation='source-in'; tg.fillStyle=col; tg.fillRect(0,0,W,H); dst.getContext('2d').drawImage(t,0,0); }
+// thick paint-by-number lines from the TARGET's colour edges (preserves internal dividers even when one region is a
+// full background), classified INNER (between two colours, ~thick) vs OUTER (against the empty page, MUCH thicker).
+// maskCv (paintable) = union(regions) MINUS the thick lines -> overspray near a boundary lands on a gap and is absorbed.
+function buildMaskAll(){
+  unionCv=morphCv(); const ug=unionCv.getContext('2d'); for(const s of stencils) ug.drawImage(maskImgs[s.seq],0,0,W,H);
+  const d=targetCtx.getImageData(0,0,W,H).data;
+  const innerE=morphCv(), outerE=morphCv(); const ic=innerE.getContext('2d'), oc=outerE.getContext('2d');
+  const iid=ic.createImageData(W,H), oid=oc.createImageData(W,H), ip=iid.data, op=oid.data;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){ const i=(y*W+x)*4; if(d[i+3]<40)continue; let inner=false, outer=false;
+    for(const dd of [[1,0],[0,1],[-1,0],[0,-1]]){ const nx=x+dd[0],ny=y+dd[1];
+      if(nx<0||ny<0||nx>=W||ny>=H){outer=true;continue;} const j=(ny*W+nx)*4;
+      if(d[j+3]<40)outer=true; else if(Math.abs(d[i]-d[j])+Math.abs(d[i+1]-d[j+1])+Math.abs(d[i+2]-d[j+2])>70)inner=true; }
+    if(inner){ ip[i]=ip[i+1]=ip[i+2]=255; ip[i+3]=255; }
+    if(outer){ op[i]=op[i+1]=op[i+2]=255; op[i+3]=255; } }
+  ic.putImageData(iid,0,0); oc.putImageData(oid,0,0);
+  const innerLines=dilateCv(innerE,INNER_R), outerLines=dilateCv(outerE,OUTER_R);
+  linesMaskCv=morphCv(); const lmg=linesMaskCv.getContext('2d'); lmg.drawImage(innerLines,0,0); lmg.drawImage(outerLines,0,0);
+  maskCtx.clearRect(0,0,W,H); maskCtx.drawImage(unionCv,0,0);
+  maskCtx.globalCompositeOperation='destination-out'; maskCtx.drawImage(linesMaskCv,0,0); maskCtx.globalCompositeOperation='source-over';   // paintable = regions MINUS thick lines
+  linesCv=morphCv(); paintShape(linesCv,innerLines,'rgba(66,59,50,0.9)'); paintShape(linesCv,outerLines,'rgba(46,40,34,0.97)');   // dark visible lines
+}
+function buildColoringSheet(){   // warm-white sheet; paintable holes punched; thick dark lines on top
+  sheetCtx.clearRect(0,0,W,H); sheetCtx.fillStyle='#f6f2e8'; roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.fill();
+  sheetCtx.save(); roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.clip();
+  sheetCtx.globalAlpha=0.04; for(let i=0;i<1100;i++){ sheetCtx.fillStyle=(i&1)?'#000':'#a89e88'; sheetCtx.fillRect(Math.random()*W,Math.random()*H,2,2);} sheetCtx.globalAlpha=1; sheetCtx.restore();
+  sheetCtx.globalCompositeOperation='destination-out'; sheetCtx.drawImage(maskCv,0,0); sheetCtx.globalCompositeOperation='source-over';   // punch the paintable holes
+  if(linesCv) sheetCtx.drawImage(linesCv,0,0);   // thick paint-by-number divider lines + outer border
+  sheetOutlineWhite(sheetCtx,0,0,W,H);
+}
+async function startColoring(){
+  buildMaskAll(); buildColoringSheet();
+  pictureOrigin={x:0,y:0};
+  active={ color:null, seq:0, home:{x:0,y:0}, box:{w:W,h:H} };   // synthetic single stencil
+  sweepCtx.clearRect(0,0,W,H); paintCtx.clearRect(0,0,W,H); spParts=[]; lastFill=null; peelOff=0;
+  carIdx=0; selColor=STAGE_COLORS[0];   // first colour pre-selected (centred in the carousel)
+  buildBottom(); const db=$('#doneBtn'); if(db)db.style.display='none';
+  state='entry';
+  await runEntry();          // goal flies up to the memo, then the stencil unrolls onto the sketchbook
+  state='spraying'; if(db)db.style.display='block'; updateHint(); ensureDraw();
+}
+// ENTRY: goal sits big & centred -> shrinks/flies to the top-right GOAL memo -> a rolled stencil unrolls onto the sketchbook
+function runEntry(){ return new Promise(async res=>{
+  const src=assets.target||STAGE.targetImage; const refBox=$('#refBox'); const fr=$('#field').getBoundingClientRect();
+  const g=document.createElement('img'); g.src=src; g.alt='';
+  const sw=fr.width*0.6, sh=sw;
+  g.style.cssText='position:fixed;z-index:57;object-fit:contain;background:#fffdf5;border-radius:26px;padding:16px;'
+    +'box-shadow:0 22px 54px rgba(40,60,60,.4),inset 0 0 0 2px rgba(0,0,0,.05);'
+    +'transition:left .72s cubic-bezier(.5,.04,.3,1),top .72s cubic-bezier(.5,.04,.3,1),width .72s cubic-bezier(.5,.04,.3,1),height .72s cubic-bezier(.5,.04,.3,1),padding .72s,border-radius .72s,transform .72s;';
+  g.style.left=(fr.left+fr.width/2-sw/2)+'px'; g.style.top=(fr.top+fr.height/2-sh/2)+'px';
+  g.style.width=sw+'px'; g.style.height=sh+'px'; g.style.transform='rotate(0deg)';
+  document.body.appendChild(g);
+  if(refBox)refBox.style.opacity='0';
+  await wait(330);
+  const rb=refBox?refBox.getBoundingClientRect():{left:fr.right-110,top:60,width:104,height:109};
+  g.style.left=rb.left+'px'; g.style.top=rb.top+'px'; g.style.width=rb.width+'px'; g.style.height=rb.height+'px';
+  g.style.padding='12px'; g.style.borderRadius='12px'; g.style.transform='rotate(3deg)';
+  await wait(740);
+  if(refBox){ refBox.style.transition='opacity .25s'; refBox.style.opacity='1'; }
+  g.remove();
+  await unrollStencil();
+  res();
+}); }
+function unrollStencil(){ return new Promise(res=>{ const dur=760, t0=performance.now();
+  (function st(){ const k=Math.min(1,(performance.now()-t0)/dur), e=1-(1-k)*(1-k); window.__uK=k;
+    ctx.clearRect(0,0,W,H); ctx.save(); roundRect(ctx,0,0,W,H,PAGE_R); ctx.clip();
+    ctx.drawImage(paintCv,0,0);
+    const revY=e*H, curl=Math.min(70,revY);
+    ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,revY); ctx.clip(); ctx.drawImage(sheetCv,0,0); ctx.restore();   // unrolled portion
+    if(revY>3 && k<1){   // rolling paper cylinder at the leading edge
+      ctx.save(); ctx.translate(0,revY-curl/2);
+      const gr=ctx.createLinearGradient(0,-curl/2,0,curl/2); gr.addColorStop(0,'#efe9dc'); gr.addColorStop(.5,'#d8d0c0'); gr.addColorStop(1,'#b9b09c');
+      ctx.fillStyle=gr; roundRect(ctx,-12,-curl/2,W+24,curl,curl/2); ctx.fill();
+      ctx.fillStyle='rgba(0,0,0,.10)'; ctx.fillRect(0,curl/2,W,10); ctx.restore();
+    }
+    ctx.restore();
+    if(k<1)requestAnimationFrame(st); else res();
+  })();
+}); }
+function onComplete(){
+  if(state!=='spraying')return;
+  const db=$('#doneBtn'); if(db)db.style.display='none';
+  fingerDown=false; if(nozzle.show){ nozzle.show=false; loopOff(A.spray); }
+  sweepCtx.globalCompositeOperation='destination-in'; sweepCtx.drawImage(maskCv,0,0); sweepCtx.globalCompositeOperation='source-over';   // clip the colouring inside the lines
+  paintCtx.drawImage(sweepCv,0,0);   // commit the clean colouring
+  state='peeling'; peelOff=0; loopOn(A.peel,0.6); const t0=performance.now();
+  (function st(){ const k=Math.min(1,(performance.now()-t0)/640); peelOff=1-(1-k)*(1-k); ensureDraw(); if(k<1)requestAnimationFrame(st); else { loopOff(A.peel); state='judging'; setTimeout(()=>showResult(computeAccuracy()),320); } })();
+}
 function rejectTile(s){
   mistakes++; updateStars();
   if(s.el){ s.el.classList.remove('reject'); void s.el.offsetWidth; s.el.classList.add('reject'); }   // rise -> turn red -> fall
@@ -494,9 +628,8 @@ function buildHoleInk(){   // clean solid colour through every hole of the curre
   holeInkCtx.fillStyle=active.color; holeInkCtx.fillRect(0,0,W,H);
   holeInkCtx.globalCompositeOperation='destination-in'; holeInkCtx.drawImage(maskCv,0,0); holeInkCtx.globalCompositeOperation='source-over';
 }
-function stepSpray(now){   // finger paints the sweep; here we just animate particles + check fill coverage
+function stepSpray(now){   // single-stencil colouring: finger paints the sweep; finishing is via the COMPLETE button only
   spParts=spParts.filter(p=>p.life>0); for(const p of spParts){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.25; p.life-=0.05; }
-  if(active && selColor===active.color && fillCover()>=0.9) finishSpray();
 }
 function finishSpray(){
   loopOff(A.spray); nozzle.show=false; fingerDown=false; $('#sprayCan').style.display='none';
@@ -572,7 +705,9 @@ function computeAccuracy(){
   for(let p=0;p<S*S;p++){ tl[p]=near(td,p*4); pl[p]=near(pd,p*4); }
   const bb=lab=>{ let mnx=S,mny=S,mxx=-1,mxy=-1; for(let y=0;y<S;y++)for(let x=0;x<S;x++){ if(lab[y*S+x]>=0){ if(x<mnx)mnx=x;if(x>mxx)mxx=x;if(y<mny)mny=y;if(y>mxy)mxy=y; } } return {mnx,mny,empty:mxx<0}; };
   const tb=bb(tl), pb=bb(pl); if(pb.empty)return 0;
-  const dtx=pb.mnx-tb.mnx, dty=pb.mny-tb.mny;
+  // single-stencil: the colouring is committed pixel-aligned with the target (no placement offset). The painted
+  // picture is the eroded (gap-bounded) version, NOT a translation, so bbox top-left alignment would over-shift it.
+  const dtx=0, dty=0;
   const comp=new Int32Array(S*S).fill(-1); let nc=0; const stk=[];
   for(let s=0;s<S*S;s++){ if(comp[s]!==-1||tl[s]<0)continue; const id=nc++; comp[s]=id; stk.push(s);
     while(stk.length){ const i=stk.pop(); const x=i%S,y=(i/S)|0;
@@ -582,10 +717,13 @@ function computeAccuracy(){
       if(y<S-1&&comp[i+S]===-1&&tl[i+S]===tl[i]){comp[i+S]=id;stk.push(i+S);} } }
   // match only INTERIOR pixels of each region (skip 1px boundary = edge-AA noise) -> a correct play reads ~100,
   // a buried region's interior shows the wrong colour -> ~0
+  // judge only the FILLABLE hole interior (the thick lines are by-design gaps, not errors): a perfect fill -> ~100%,
+  // an unpainted hole -> 0 (skipped colour penalised), a wrong colour -> low (covers coverage + correctness at once).
+  const mcd=mkS(S,maskCv).getImageData(0,0,S,S).data;
   const iarea=new Float64Array(nc), iok=new Float64Array(nc);
-  for(let y=1;y<S-1;y++)for(let x=1;x<S-1;x++){ const i=y*S+x, id=comp[i]; if(id<0)continue;
-    if(tl[i]===tl[i-1]&&tl[i]===tl[i+1]&&tl[i]===tl[i-S]&&tl[i]===tl[i+S]){ iarea[id]++; const sx=x+dtx,sy=y+dty; if(sx>=0&&sy>=0&&sx<S&&sy<S&&pl[sy*S+sx]===tl[i])iok[id]++; } }
-  const minA=Math.round(S*S*0.003); let sum=0,cnt=0;
+  for(let y=1;y<S-1;y++)for(let x=1;x<S-1;x++){ const i=y*S+x, id=comp[i]; if(id<0)continue; if(mcd[i*4+3]<128)continue;
+    if(tl[i]===tl[i-1]&&tl[i]===tl[i+1]&&tl[i]===tl[i-S]&&tl[i]===tl[i+S]){ iarea[id]++; if(pl[i]===tl[i])iok[id]++; } }
+  const minA=Math.round(S*S*0.0015); let sum=0,cnt=0;
   for(let id=0;id<nc;id++){ if(iarea[id]<minA)continue; sum+=iok[id]/iarea[id]; cnt++; }
   const avg = cnt? sum/cnt : 0;
   const colorFrac = Math.min(1, avg/0.985);   // colour + ORDER correctness (translation-invariant)
@@ -622,21 +760,14 @@ function render(now){
     ctx.strokeStyle='rgba(70,95,95,0.11)'; ctx.lineWidth=1;
     for(let i=1;i<GRID;i++){ const p=i*CELL; ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,H);ctx.stroke(); ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(W,p);ctx.stroke(); }
   } else if(state==='spraying'){
-    // sheet covers the picture; the colour the finger sprays accumulates on top (incl. stray on the sheet)
-    ctx.drawImage(sheetCv,0,0);
+    // colouring shows in the holes; the white sheet (on top) hides any overspray outside the lines
     ctx.drawImage(sweepCv,0,0);
+    ctx.drawImage(sheetCv,0,0);
     for(const p of spParts){ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,3+3*p.life,0,7); ctx.fill(); } ctx.globalAlpha=1;
   } else if(state==='peeling'){
-    // clean result underneath (revealed where the messy sheet has peeled away)
-    ctx.drawImage(holeInkCv,0,0);
-    const f=peel*peelL;
-    const remain=clipHalf(peelSquare,f,true);             // sheet still down (proj>=f)
-    if(remain.length){ ctx.save(); pathPoly(ctx,remain); ctx.clip(); ctx.drawImage(sheetCv,0,0); ctx.restore(); }
-    const shp=clipHalf(clipHalf(peelSquare,f,true),f+34,false); // shadow cast by lifted paper
-    if(shp.length){ ctx.save(); pathPoly(ctx,shp); ctx.clip();
-      const sg=ctx.createLinearGradient(ox+dX*f,oy+dY*f,ox+dX*(f+34),oy+dY*(f+34)); sg.addColorStop(0,'rgba(0,0,0,.22)'); sg.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.fillStyle=sg; ctx.fillRect(0,0,W,H); ctx.restore(); }
-    drawCurl(f);                                            // rolled-up band at the peel front
+    // paintCv (the committed clean colouring) is already drawn above; overlay the clean divider lines, then slide the sheet off
+    if(linesCv) ctx.drawImage(linesCv,0,0);
+    ctx.save(); ctx.globalAlpha=Math.max(0,1-peelOff); ctx.translate(-peelOff*W*1.15, -peelOff*H*0.5); ctx.rotate(-peelOff*0.12); ctx.drawImage(sheetCv,0,0); ctx.restore();
   }
   ctx.restore();   // end page-corner clip
   // spray nozzle cursor
@@ -738,16 +869,19 @@ function openGallery(){ let g={}; try{g=JSON.parse(localStorage.getItem('ss_gall
   grid.innerHTML = items.length ? items.map(it=>`<div class="gcell"><img src="${it.pic}"></div>`).join('') : '<p class="gempty">No pictures yet 🖼️</p>';
   $('#galCount').textContent = `${items.length} collected`;
   $('#gallery').classList.add('show'); }
-function showResult(){
+function showResult(acc){
   state='judging';
-  const p=$('#popup'); const pic=paintCv.toDataURL();
+  acc = (typeof acc==='number') ? acc : 100;
+  const p=$('#popup');
+  const comp=cloneCv(paintCv); if(linesCv) comp.getContext('2d').drawImage(linesCv,0,0);   // finished picture with clean divider/border lines
+  const pic=comp.toDataURL();
   saveToGallery(pic);
-  const praise = pick(WIN_LINES);
+  const praise = acc>=95?'Beautiful work!' : acc>=85?'Lovely colouring!' : acc>=70?'Nicely done!' : 'Good effort!';
   const draw=`<div class="rdraw pop"><img src="${pic}"></div>`;
   const nextBtn = `<button class="btn" id="nx">${STAGE.next?'NEXT ▶':'PAINT AGAIN'}</button>`;
   const galBtn = `<button class="btn alt" id="gal">SKETCHBOOK 📒</button>`;
-  sfx('win'); if(navigator.vibrate)navigator.vibrate([20,40,20,40,40]); p.className='panel'; launchConfetti(true);
-  p.innerHTML=`${draw}<div class="praise">${praise}</div><p class="score">Saved to your sketchbook ✓</p>${nextBtn}${galBtn}`;
+  sfx('win'); if(navigator.vibrate)navigator.vibrate([20,40,20,40,40]); p.className='panel'; launchConfetti(acc>=85);
+  p.innerHTML=`${draw}<div class="praise">${praise}</div><p class="score">ACCURACY ${acc}%</p>${nextBtn}${galBtn}`;
   $('#overlay').classList.add('show');
   const nx=$('#nx'); if(nx) nx.onclick=()=>{ if(STAGE.next)location.href=STAGE.next; else location.reload(); };
   const gal=$('#gal'); if(gal) gal.onclick=openGallery;
@@ -763,12 +897,16 @@ function setHint(t){ const h=$('#hint'); if(!t){h.classList.add('hide');return;}
 
 // ---------- QA hooks (harmless in normal play) ----------
 window.__qa={ state:()=>state,
-  color:()=>active?active.color:null,
-  pick:(c)=>{ selColor=c; buildBottom(); },
-  stray:(x,y)=>{ if(!active)return; const r=brushR(); sweepCtx.fillStyle=active.color; sweepCtx.beginPath(); sweepCtx.arc(x,y,r,0,7); sweepCtx.fill(); ensureDraw(); },   // paint a blob (test stray-stays)
-  fillCurrent:()=>{ if(!active)return false; selColor=active.color; const t=document.createElement('canvas');t.width=W;t.height=H;const g=t.getContext('2d'); g.fillStyle=active.color; g.fillRect(0,0,W,H); g.globalCompositeOperation='destination-in'; g.drawImage(maskCv,0,0); sweepCtx.drawImage(t,0,0); ensureDraw(); return true; },
+  colors:()=>STAGE_COLORS.slice(),
+  pick:(c)=>{ const i=STAGE_COLORS.indexOf(c); if(i>=0)selectCan(i); else selColor=c; },
+  brush:(r)=>{ brushRadius=r; const sl=$('#wslider'); if(sl)sl.value=r; updateWcirc(); return brushRadius; },
+  entryDone:()=>state!=='entry'&&state!=='loading',
+  sprayAt:(x,y)=>{ if(!selColor){ selColor=STAGE_COLORS[0]; buildBottom(); } fillSpray(x,y); },   // finger-spray one dab (exercises the paint path)
+  // PERFECT colouring: copy the target into the sweep, clipped to the holes (simulates flawless paint-by-number)
+  autoFill:()=>{ const t=document.createElement('canvas');t.width=W;t.height=H;const g=t.getContext('2d'); g.drawImage(targetCv,0,0); g.globalCompositeOperation='destination-in'; g.drawImage(maskCv,0,0); sweepCtx.drawImage(t,0,0); ensureDraw(); return true; },
+  complete:()=>onComplete(),
   pix:(x,y)=>{ const d=paintCtx.getImageData(x|0,y|0,1,1).data; return [d[0],d[1],d[2],d[3]]; },
-  result:()=>{ const ov=$('#overlay'); if(!ov||!ov.classList.contains('show'))return null; const p=$('#popup'),sc=p.querySelector('.score'); return 'WIN '+(sc?sc.textContent:''); } };
+  result:()=>{ const ov=$('#overlay'); if(!ov||!ov.classList.contains('show'))return null; const p=$('#popup'),sc=p.querySelector('.score'); return sc?sc.textContent:''; } };
 // ---------- developer mode: top-left toggle + jump between stages ----------
 (function(){ const TOTAL=30, id=(typeof STAGE!=='undefined'&&STAGE.id)||1, dev=$('#dev');
   if(localStorage.getItem('ss_dev')==='1') dev.classList.add('on');
