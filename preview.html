@@ -39,7 +39,7 @@
   #refPin{position:absolute;top:-27px;left:50%;transform:translateX(-50%);width:60px;height:60px;z-index:3;filter:drop-shadow(0 6px 7px rgba(0,0,0,.28));pointer-events:none;}
   #refBox.zoom{transform:rotate(0deg) scale(3.2);box-shadow:0 26px 60px rgba(0,0,0,.4);cursor:zoom-out;}
   /* bottom controls gathered at the lower-right, just left of the submit check */
-  #bottom{position:absolute;left:0;right:0;bottom:96px;height:200px;z-index:5;display:flex;align-items:center;justify-content:flex-end;padding-right:212px;padding-left:40px;}
+  #bottom{position:absolute;left:0;right:0;bottom:96px;height:200px;z-index:5;display:flex;align-items:center;justify-content:flex-start;padding-left:54px;padding-right:40px;}
   #canHint{display:none;}
   /* colour CAROUSEL — swipe/drag horizontally, tap to select; centred colour emphasised */
   #cans{position:relative;flex:0 0 auto;width:600px;height:192px;overflow:hidden;cursor:grab;}
@@ -171,6 +171,8 @@ let state='loading';            // loading|idle|placing|spraying|awaitPeel|peeli
 let active=null;                // current stencil
 let tutorial=!!STAGE.tutorial;
 const stencils=STAGE.stencils.map(s=>({...s,used:false}));
+const order=stencils.slice().sort((a,b)=>a.seq-b.seq);   // progressive paint order: back -> front, one stencil per step
+let stepIdx=0;
 // carousel display order: paint order (easy) for stages 1-2, SHUFFLED from stage 3 so the player must work out the order
 // HEALING: present stencils in correct paint order (back -> front). The "next" one is gently highlighted.
 const displayOrder=stencils.slice();
@@ -213,7 +215,7 @@ function sfx(k){ if(A[k]){try{A[k].currentTime=0;A[k].play().catch(()=>{});}catc
   if(assets.can2)$('#sprayCan').src=assets.can2;
   setupRefZoom();
   $('#bookBtn').onclick=openGallery; $('#galClose').onclick=()=>$('#gallery').classList.remove('show');
-  $('#doneBtn').onclick=onComplete;
+  $('#doneBtn').onclick=advance;
   targetImg=await loadImg(assets.target||STAGE.targetImage);
   if(targetImg)targetCtx.drawImage(targetImg,0,0,W,H);
   for(const s of stencils){ maskImgs[s.seq]=await loadImg((assets.masks&&assets.masks[s.mask])||s.mask); }
@@ -385,16 +387,68 @@ function buildColoringSheet(){   // BLACK spray stencil laid over the white pape
   sheetCtx.globalCompositeOperation='destination-out'; sheetCtx.drawImage(maskCv,0,0); sheetCtx.globalCompositeOperation='source-over';   // punch the paintable holes
   sheetOutlineWhite(sheetCtx,0,0,W,H);
 }
+// PROGRESSIVE separated-stencil flow: one stencil (one colour region) laid at a time.
+// colour it -> NEXT(→) peels it off, reveals the drawing so far, then the next stencil unrolls.
+// last stencil -> button becomes COMPLETE(✓) -> submit + accuracy.
+// masks are subtree-nested (background = whole frame). Derive DISJOINT per-step holes:
+// stepMask[i] = subtree(i) MINUS every later subtree -> only layer i's own visible area (clean paint-by-number).
+const stepMaskCv=[];
+function buildStepMasks(){
+  for(let i=0;i<order.length;i++){ const c=morphCv(), g=c.getContext('2d');
+    g.drawImage(maskImgs[order[i].seq],0,0,W,H);
+    g.globalCompositeOperation='destination-out';
+    for(let j=i+1;j<order.length;j++) g.drawImage(maskImgs[order[j].seq],0,0,W,H);   // subtract foreground layers drawn on top
+    g.globalCompositeOperation='source-over'; stepMaskCv[i]=c; }
+}
+function buildStepSheet(){   // BLACK stencil whose ONLY hole is the CURRENT layer (maskCv)
+  sheetCtx.clearRect(0,0,W,H); sheetCtx.fillStyle='#23232b'; roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.fill();
+  sheetCtx.save(); roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.clip();
+  sheetCtx.globalAlpha=0.05; for(let i=0;i<900;i++){ sheetCtx.fillStyle=(i&1)?'#000':'#4a4a57'; sheetCtx.fillRect(Math.random()*W,Math.random()*H,2,2);} sheetCtx.globalAlpha=1; sheetCtx.restore();
+  sheetCtx.globalCompositeOperation='destination-out'; sheetCtx.drawImage(maskCv,0,0); sheetCtx.globalCompositeOperation='source-over';   // punch the current layer's hole
+  sheetOutlineWhite(sheetCtx,0,0,W,H);
+}
+function prepStep(i){   // current disjoint region mask (clip + hole) + its black sheet
+  stepIdx=i; const s=order[i]; active=s;
+  maskCtx.clearRect(0,0,W,H); maskCtx.drawImage(stepMaskCv[i],0,0,W,H);   // maskCv = this layer's own area
+  buildStepSheet();
+  sweepCtx.clearRect(0,0,W,H); spParts=[]; lastFill=null; fingerDown=false;
+}
+function setStepButton(){ const db=$('#doneBtn'); if(db){ db.textContent=(stepIdx>=order.length-1)?'✓':'→'; db.style.display='block'; } }
 async function startColoring(){
-  buildMaskAll(); buildColoringSheet();
-  pictureOrigin={x:0,y:0};
-  active={ color:null, seq:0, home:{x:0,y:0}, box:{w:W,h:H} };   // synthetic single stencil
-  sweepCtx.clearRect(0,0,W,H); paintCtx.clearRect(0,0,W,H); spParts=[]; lastFill=null; peelOff=0;
-  carIdx=0; selColor=STAGE_COLORS[0];   // first colour pre-selected (centred in the carousel)
+  buildMaskAll();                                   // builds linesCv (final divider lines) + unionCv
+  buildStepMasks();                                 // disjoint per-layer holes
+  paintCtx.clearRect(0,0,W,H); peelOff=0; carIdx=0; selColor=STAGE_COLORS[0];
+  prepStep(0);
   buildBottom(); const db=$('#doneBtn'); if(db)db.style.display='none';
   state='entry';
-  await runEntry();          // goal flies up to the memo, then the stencil unrolls onto the sketchbook
-  state='spraying'; if(db)db.style.display='block'; selectCan(0); updateHint(); ensureDraw();   // pre-pick first colour -> spray-can appears
+  await runEntry();                                 // goal flies to the memo, then stencil 0 unrolls
+  state='spraying'; setStepButton(); selectCan(0); updateHint(); ensureDraw();
+}
+async function layStep(i){
+  prepStep(i);
+  const db=$('#doneBtn'); if(db)db.style.display='none';
+  state='laying';
+  await unrollStencil();                            // the next stencil rolls on over the drawing so far
+  state='spraying'; setStepButton(); selectCan(carIdx); updateHint(); ensureDraw();
+}
+function commitStep(){
+  fingerDown=false; if(nozzle.show){ nozzle.show=false; loopOff(A.spray); }
+  sweepCtx.globalCompositeOperation='destination-in'; sweepCtx.drawImage(maskCv,0,0); sweepCtx.globalCompositeOperation='source-over';   // keep colour only inside the current region
+  paintCtx.drawImage(sweepCv,0,0);                  // commit it into the accumulating picture
+  order[stepIdx].used=true;
+}
+function advance(){
+  if(state!=='spraying')return;
+  const db=$('#doneBtn'); if(db)db.style.display='none';
+  commitStep();
+  const last = stepIdx>=order.length-1;
+  state='peeling'; peelOff=0; loopOn(A.peel,0.6); const t0=performance.now();
+  (function st(){ const k=Math.min(1,(performance.now()-t0)/560); peelOff=1-(1-k)*(1-k); ensureDraw();
+    if(k<1){ requestAnimationFrame(st); return; }
+    loopOff(A.peel);
+    if(last){ state='judging'; setTimeout(()=>showResult(computeAccuracy()),360); }
+    else { state='revealed'; ensureDraw(); setTimeout(()=>layStep(stepIdx+1),560); }   // show the drawing briefly, then lay the next stencil
+  })();
 }
 // ENTRY: goal sits big & centred -> shrinks/flies to the top-right GOAL memo -> a rolled stencil unrolls onto the sketchbook
 function runEntry(){ return new Promise(async res=>{
@@ -421,7 +475,9 @@ function runEntry(){ return new Promise(async res=>{
 function unrollStencil(){ return new Promise(res=>{ const dur=760, t0=performance.now();
   (function st(){ const k=Math.min(1,(performance.now()-t0)/dur), e=1-(1-k)*(1-k); window.__uK=k;
     ctx.clearRect(0,0,W,H); ctx.save(); roundRect(ctx,0,0,W,H,PAGE_R); ctx.clip();
+    ctx.fillStyle='#fcfaf4'; ctx.fillRect(0,0,W,H);            // solid white paper under the unrolling stencil
     ctx.drawImage(paintCv,0,0);
+    if(linesCv) ctx.drawImage(linesCv,0,0);                    // show divider lines on the drawing so far
     const revY=e*H, curl=Math.min(70,revY);
     ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,revY); ctx.clip(); ctx.drawImage(sheetCv,0,0); ctx.restore();   // unrolled portion
     if(revY>3 && k<1){   // rolling paper cylinder at the leading edge
@@ -775,6 +831,9 @@ function render(now){
     if(linesCv) ctx.drawImage(linesCv,0,0);
     ctx.save(); ctx.globalAlpha=Math.max(0,1-peelOff); ctx.translate(-peelOff*W*1.15, -peelOff*H*0.5); ctx.rotate(-peelOff*0.12);
     ctx.drawImage(sheetCv,0,0); ctx.globalAlpha=Math.max(0,1-peelOff)*0.34; ctx.drawImage(sweepCv,0,0); ctx.restore();   // ink rides off with the stencil
+  } else if(state==='revealed'){
+    // brief beat between stencils: the drawing so far (paintCv, drawn above) + clean divider lines, no sheet
+    if(linesCv) ctx.drawImage(linesCv,0,0);
   }
   ctx.restore();   // end page-corner clip
   // spray-can: appears once a colour is picked; follows the finger while spraying, otherwise rests at the lower-right of the canvas
@@ -910,9 +969,10 @@ window.__qa={ state:()=>state,
   brush:(r)=>{ brushRadius=r; const sl=$('#wslider'); if(sl)sl.value=r; updateWcirc(); return brushRadius; },
   entryDone:()=>state!=='entry'&&state!=='loading',
   sprayAt:(x,y)=>{ if(!selColor){ selColor=STAGE_COLORS[0]; buildBottom(); } fillSpray(x,y); },   // finger-spray one dab (exercises the paint path)
-  // PERFECT colouring: copy the target into the sweep, clipped to the holes (simulates flawless paint-by-number)
+  // PERFECT colouring of the CURRENT step: copy target into sweep, clipped to the current region's hole
   autoFill:()=>{ const t=document.createElement('canvas');t.width=W;t.height=H;const g=t.getContext('2d'); g.drawImage(targetCv,0,0); g.globalCompositeOperation='destination-in'; g.drawImage(maskCv,0,0); sweepCtx.drawImage(t,0,0); ensureDraw(); return true; },
-  complete:()=>onComplete(),
+  steps:()=>order.length, step:()=>stepIdx,
+  next:()=>advance(), complete:()=>advance(),
   pix:(x,y)=>{ const d=paintCtx.getImageData(x|0,y|0,1,1).data; return [d[0],d[1],d[2],d[3]]; },
   result:()=>{ const ov=$('#overlay'); if(!ov||!ov.classList.contains('show'))return null; const p=$('#popup'),sc=p.querySelector('.score'); return sc?sc.textContent:''; } };
 // ---------- developer mode: top-left toggle + jump between stages ----------
