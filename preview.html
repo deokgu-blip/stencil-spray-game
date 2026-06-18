@@ -252,15 +252,18 @@ function layoutCarousel(){
   });
 }
 // ---------- input: swipe carousel to rotate; drag the CENTRE stencil UP to lift & place ----------
-let carDown=null, carMode=null, carStart=0;
-$('#queue').addEventListener('pointerdown',e=>{ if(state!=='idle'||!carItems.length)return; e.preventDefault(); carDown={x:e.clientX,y:e.clientY}; carMode=null; carStart=carIndex; });
+let carDown=null, carMode=null, carStart=0, carDownTile=null;
+const canQueue=()=>(state==='idle'||state==='spraying'||state==='peeling')&&carItems.length;  // queue usable even while the previous sprays/peels
+const tileAt=(x,y)=>{ const el=document.elementFromPoint(x,y), t=el&&el.closest&&el.closest('.ctile'); return carItems.find(s=>s.el===t)||null; };
+$('#queue').addEventListener('pointerdown',e=>{ if(!canQueue())return; e.preventDefault(); carDown={x:e.clientX,y:e.clientY}; carDownTile=tileAt(e.clientX,e.clientY); carMode=null; carStart=carIndex; });
 const SWIPE_STEP=72;
 function onGlobalMove(e){
   if(state==='dragging'){ onDragMove(e); return; }
   if(!carDown) return;
   const dx=e.clientX-carDown.x, dy=e.clientY-carDown.y;
   if(carMode===null){
-    if(dy<-22 && Math.abs(dy)>Math.abs(dx)*1.3){ carMode='grab'; const s=carItems[carIndex]; carDown=null; if(s) startFloatDrag(s,e); return; }
+    // drag UP -> grab the tile the finger STARTED on (a side tile becomes the selected one), else the centre
+    if(dy<-22 && Math.abs(dy)>Math.abs(dx)*1.3){ carMode='grab'; const s=carDownTile||carItems[carIndex]; carDown=null; if(s){ const i=carItems.indexOf(s); if(i>=0)carIndex=i; layoutCarousel(); startFloatDrag(s,e); } return; }
     if(Math.abs(dx)>10) carMode='swipe';
   }
   if(carMode==='swipe'){ carIndex=Math.max(0,Math.min(carItems.length-1, carStart+Math.round(-dx/SWIPE_STEP))); layoutCarousel(); }
@@ -268,12 +271,11 @@ function onGlobalMove(e){
 function onGlobalUp(e){
   if(state==='dragging'){ onDragDrop(); return; }
   // a TAP (no swipe / no drag-up) on a SIDE stencil -> bring that stencil to the centre
-  if(carDown && carMode===null && state==='idle' && carItems.length){
-    const el=document.elementFromPoint(carDown.x, carDown.y), tile=el&&el.closest&&el.closest('.ctile');
-    const idx=carItems.findIndex(s=>s.el===tile);
+  if(carDown && carMode===null && canQueue()){
+    const idx=carDownTile?carItems.indexOf(carDownTile):-1;
     if(idx>=0 && idx!==carIndex){ carIndex=idx; layoutCarousel(); }
   }
-  carDown=null; carMode=null;
+  carDown=null; carMode=null; carDownTile=null;
 }
 window.addEventListener('pointermove',onGlobalMove);
 window.addEventListener('pointerup',onGlobalUp);
@@ -297,7 +299,8 @@ function stepConfetti(){ cfx.clearRect(0,0,innerWidth,innerHeight); let alive=0;
   if(alive>0) cfRAF=requestAnimationFrame(stepConfetti); else { cfx.clearRect(0,0,innerWidth,innerHeight); cfRAF=0; confetti=[]; } }
 // ---------- drag the stencil onto the field (grid). release-wobble is rejected so the position doesn't jump on lift ----------
 let dragPrevPos=null, dragLastT=0, dragLastCells=0;
-function startFloatDrag(s,e){ state='dragging'; dragging=s; dragBox=s.box; dragHome=s.home; dragTileCv=s.dragSheet; dragOverField=true; dragPos=null; dragPrevPos=null; if(s.el)s.el.style.visibility='hidden'; $('#hint').classList.add('hide'); ensureDraw(); onDragMove(e); }
+function startFloatDrag(s,e){ if(active) finalizeActive();   // commit the previous (still spraying/peeling) instantly so we can grab the next now
+  state='dragging'; dragging=s; dragBox=s.box; dragHome=s.home; dragTileCv=s.dragSheet; dragOverField=true; dragPos=null; dragPrevPos=null; if(s.el)s.el.style.visibility='hidden'; $('#hint').classList.add('hide'); ensureDraw(); onDragMove(e); }
 function onDragMove(e){
   if(state!=='dragging') return;
   const r=playCv.getBoundingClientRect(), ds=r.width/W;
@@ -351,15 +354,16 @@ function holeRim(seq,home,bw,bh){
 }
 
 // ---------- place stencil ----------
-let placeStart=0, placedSfx=false;
+let placeStart=0, placedSfx=false, placeGen=0;
 function easeOutBack(t){ const c1=1.70158,c3=c1+1; return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2); }
 let lastDeltaCells=0;
 function placeStencil(s,offset){
-  active=s; placeOffset=offset||{x:0,y:0};
+  active=s; placeOffset=offset||{x:0,y:0}; placeGen++;
   s.placedOffset={x:placeOffset.x, y:placeOffset.y};   // remembered for per-part position scoring
   // the FIRST placed stencil defines where the picture sits; later ones are rated by how consistent they are
   if(stencils.filter(x=>x.used).length===0) pictureOrigin={x:placeOffset.x, y:placeOffset.y};
   lastDeltaCells = pictureOrigin ? Math.hypot(placeOffset.x-pictureOrigin.x, placeOffset.y-pictureOrigin.y)/CELL : 0;
+  s.deltaCells=lastDeltaCells;
   // build the mask TRANSLATED by the placed offset; everything (spray, holes, peel) derives from this
   maskCtx.clearRect(0,0,W,H); maskCtx.drawImage(maskImgs[s.seq], placeOffset.x, placeOffset.y, W, H);
   sweepCtx.clearRect(0,0,W,H); holeInkCtx.clearRect(0,0,W,H); peel=0; sprayT=0;
@@ -368,6 +372,8 @@ function placeStencil(s,offset){
   buildSheetBase();
   sfx('chak'); if(navigator.vibrate)navigator.vibrate(16);
   startSpray();   // dragged into place already -> straight to spray (no extra drop animation)
+  // advance the queue NOW (don't wait for spray/peel): this stencil leaves, the next centres+enlarges & is grabbable
+  s.used=true; buildCarousel(); updateProgress();
 }
 async function layStencil(){
   const x0=active.home.x+placeOffset.x, y0=active.home.y+placeOffset.y, bw=active.box.w, bh=active.box.h, cx=x0+bw/2, cy=y0+bh/2;
@@ -383,18 +389,10 @@ async function layStencil(){
   startSpray();
 }
 function buildSheetBase(){
-  // MATTE black plastic stencil sheet — FIXED size, drawn at the placed position (not the whole field)
+  // WHITE paper stencil sheet on the field — IDENTICAL to the queue tile (white + real holes + rim + outline)
   sheetCtx.clearRect(0,0,W,H);
-  const x0=active.home.x+placeOffset.x, y0=active.home.y+placeOffset.y, bw=active.box.w, bh=active.box.h;
-  sheetCtx.save(); roundRect(sheetCtx,x0,y0,bw,bh,22); sheetCtx.clip();
-  sheetCtx.fillStyle='#2c2c31'; sheetCtx.fillRect(x0,y0,bw,bh);
-  const v=sheetCtx.createRadialGradient(x0+bw/2,y0+bh*0.42,bw*0.1,x0+bw/2,y0+bh/2,Math.max(bw,bh)*0.75);
-  v.addColorStop(0,'rgba(255,255,255,0.04)'); v.addColorStop(1,'rgba(0,0,0,0.18)');
-  sheetCtx.fillStyle=v; sheetCtx.fillRect(x0,y0,bw,bh);
-  sheetCtx.globalAlpha=0.05; for(let i=0;i<520;i++){ sheetCtx.fillStyle=(i&1)?'#fff':'#000'; sheetCtx.fillRect(x0+Math.random()*bw,y0+Math.random()*bh,2,2); } sheetCtx.globalAlpha=1;
-  sheetCtx.restore();
-  sheetCtx.globalCompositeOperation='destination-out'; sheetCtx.drawImage(maskCv,0,0); sheetCtx.globalCompositeOperation='source-over';
-  sheetOutline(sheetCtx,x0,y0,bw,bh);   // always-visible outline
+  const x0=active.home.x+placeOffset.x, y0=active.home.y+placeOffset.y;
+  sheetCtx.drawImage(active.dragSheet, x0, y0);   // same prebuilt white sheet shown in the carousel/drag
 }
 
 // ---------- auto spray (zigzag TL -> BR) ----------
@@ -419,13 +417,19 @@ function buildSprayZone(){
   const d=maskCtx.getImageData(0,0,W,H).data; let mnx=W,mny=H,mxx=0,mxy=0,any=false;
   for(let y=0;y<H;y++){ const r=y*W; for(let x=0;x<W;x++){ if(d[(r+x)*4+3]>40){ any=true; if(x<mnx)mnx=x;if(x>mxx)mxx=x;if(y<mny)mny=y;if(y>mxy)mxy=y; } } }
   if(!any){ mnx=0;mny=0;mxx=W-1;mxy=H-1; }
-  const m=Math.round(SPRAY_R*1.05);
+  const m=Math.round(SPRAY_R*1.5);
   const x0=Math.max(0,mnx-m), y0=Math.max(0,mny-m), x1=Math.min(W,mxx+1+m), y1=Math.min(H,mxy+1+m);
   sprayBox={ x0, y0, x1, y1 };
   sprayRows=Math.max(5, Math.round((y1-y0)/(SPRAY_R*0.42)));     // dense rows -> solid messy coverage of the zone
   const diag=Math.hypot(x1-x0,y1-y0), maxDiag=Math.hypot(W,H);
   sprayDur=Math.round(360 + (diag/maxDiag)*740);                 // small region -> short spray, big region -> longer
-  dilatedCtx.clearRect(0,0,W,H); dilatedCtx.fillStyle='#fff'; roundRect(dilatedCtx,x0,y0,x1-x0,y1-y0,20); dilatedCtx.fill();
+  // overspray zone = the hole shape DILATED with an irregular, dirty edge (organic -> never a clean rectangle)
+  dilatedCtx.clearRect(0,0,W,H); dilatedCtx.globalAlpha=1;
+  const N=20, baseR=SPRAY_R*1.18;
+  for(let a=0;a<N;a++){ const an=a/N*6.283, rr=baseR*(0.45+Math.random()*0.95); dilatedCtx.drawImage(maskCv, Math.cos(an)*rr, Math.sin(an)*rr); }
+  dilatedCtx.drawImage(maskCv,0,0);   // guarantee the holes themselves are fully inside the zone
+  for(let a=0;a<13;a++){ const an=Math.random()*6.283, rr=baseR*(1.25+Math.random()*1.2); dilatedCtx.globalAlpha=0.22+Math.random()*0.4; dilatedCtx.drawImage(maskCv, Math.cos(an)*rr, Math.sin(an)*rr); }  // faint broken stray overspray
+  dilatedCtx.globalAlpha=1;
 }
 // serpentine path within the spray box (top-left -> bottom-right of the box)
 function pathPoint(p){
@@ -487,23 +491,33 @@ function finishSpray(){
   ox=px0; oy=py0; peelL=Math.hypot(pw,ph); dX=pw/peelL; dY=ph/peelL;
   peelSquare=[[px0,py0],[px0+pw,py0],[px0+pw,py0+ph],[px0,py0+ph]];
   state='peeling'; peel=0;
-  setTimeout(()=>{ loopOn(A.peel,0.6); animatePeelTo(1, ()=>{ loopOff(A.peel); finishPeel(); }, 650); }, 180);
+  const g=placeGen;   // if a new stencil is placed (or this one is finalized early) before peel ends, abort these stale callbacks
+  setTimeout(()=>{ if(g!==placeGen)return; loopOn(A.peel,0.6); animatePeelTo(1, ()=>{ if(g!==placeGen)return; loopOff(A.peel); finishPeel(); }, 650); }, 180);
 }
 
 // ---------- peel (drag the sheet off) ----------
 function evtXY(e){ const r=playCv.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*W, y:(e.clientY-r.top)/r.height*H}; }
-function animatePeelTo(tgt,cb,dur){ dur=dur||300; const from=peel,t0=performance.now(); (function st(){ const k=Math.min(1,(performance.now()-t0)/dur); peel=from+(tgt-from)*(1-(1-k)*(1-k)); if(k<1)requestAnimationFrame(st); else{peel=tgt;cb&&cb();} })(); }
-function finishPeel(){
-  // snapshot this part's clean ink (for the end-stage review re-reveal) + its centre (for the pencil score)
+function animatePeelTo(tgt,cb,dur){ dur=dur||300; const from=peel,t0=performance.now(),g=placeGen; (function st(){ if(g!==placeGen)return; const k=Math.min(1,(performance.now()-t0)/dur); peel=from+(tgt-from)*(1-(1-k)*(1-k)); if(k<1)requestAnimationFrame(st); else{peel=tgt;cb&&cb();} })(); }
+function commitActive(rate){   // burn the current stencil's clean through-hole ink onto the painting
+  if(!active)return;
   active.layerCv=cloneCv(holeInkCv); active.scoreCenter=bboxCenter(holeInkCv);
-  // commit clean through-hole ink onto the painting (opaque -> later overwrites earlier = burying)
-  paintCtx.drawImage(holeInkCv,0,0);
-  sfx('chak'); if(navigator.vibrate)navigator.vibrate([8,24,8]);
-  showRating(lastDeltaCells);               // PERFECT / EXCELLENT / GOOD for this placement
-  active.used=true; active=null;
-  buildCarousel(); updateProgress();
+  paintCtx.drawImage(holeInkCv,0,0);   // opaque -> later overwrites earlier = burying (wrong order shows it)
+  if(rate){ sfx('chak'); if(navigator.vibrate)navigator.vibrate([8,24,8]); showRating(active.deltaCells||0); }
+  active=null;
+}
+function finishPeel(){   // natural end of the spray->peel animation (used + queue already advanced at placeStencil)
+  commitActive(true);
   if(stencils.every(s=>s.used)){ state='review'; runReview(); }   // all placed -> scoring review animation
-  else { state='idle'; ensureDraw(); }
+  else if(state!=='dragging'){ state='idle'; ensureDraw(); }
+}
+// commit the in-flight stencil INSTANTLY (the player grabbed the next before its spray/peel finished)
+function finalizeActive(){
+  if(!active)return;
+  placeGen++;                              // invalidate any pending spray/peel callbacks
+  loopOff(A.spray); loopOff(A.peel); nozzle.show=false; const can=$('#sprayCan'); if(can)can.style.display='none';
+  buildHoleInk();                          // make sure the solid ink is ready, then commit (no rating popup mid-action)
+  commitActive(false);
+  sweepCtx.clearRect(0,0,W,H); sheetCtx.clearRect(0,0,W,H); holeInkCtx.clearRect(0,0,W,H); peel=0;
 }
 // ---------- end-of-stage scoring review: fade out -> target -> re-reveal parts in order + pencil scores ----------
 function cloneCv(cv){ const c=document.createElement('canvas'); c.width=cv.width; c.height=cv.height; c.getContext('2d').drawImage(cv,0,0); return c; }
@@ -556,7 +570,15 @@ function computeAccuracy(){
   const minA=Math.round(S*S*0.003); let sum=0,cnt=0;
   for(let id=0;id<nc;id++){ if(iarea[id]<minA)continue; sum+=iok[id]/iarea[id]; cnt++; }
   const avg = cnt? sum/cnt : 0;
-  return Math.max(0, Math.min(100, Math.round(avg/0.985*100)));
+  const colorFrac = Math.min(1, avg/0.985);   // colour + ORDER correctness (translation-invariant)
+  // POSITION correctness: every placed stencil should share the same offset as the rest (pictureOrigin).
+  // Relative misalignment (pieces not fitting -> gaps) is penalised; a uniformly-shifted picture still scores full.
+  let posSum=0,posN=0;
+  if(pictureOrigin){ for(const s of stencils){ if(!s.used||!s.placedOffset)continue;
+    const e=Math.hypot(s.placedOffset.x-pictureOrigin.x, s.placedOffset.y-pictureOrigin.y)/CELL;   // cells off the consensus
+    posSum+=Math.max(0, 1 - e*0.42); posN++; } }
+  const posFrac = posN? posSum/posN : 1;
+  return Math.max(0, Math.min(100, Math.round(colorFrac*posFrac*100)));
 }
 
 // ---------- helpers ----------
@@ -724,7 +746,9 @@ function setHint(t){ const h=$('#hint'); if(!t){h.classList.add('hide');return;}
 window.__qa={ state:()=>state,
   place:(seq)=>{ if(state!=='idle')return false; const s=stencils.find(x=>x.seq===seq); if(!s||s.used)return false; placeStencil(s,{x:0,y:0}); return true; },  // correct placement (any remaining)
   placeAt:(seq,cx,cy)=>{ if(state!=='idle')return false; const s=stencils.find(x=>x.seq===seq); if(!s)return false; placeStencil(s,{x:Math.round(cx)*CELL,y:Math.round(cy)*CELL}); return true; },
-  result:()=>{ const ov=$('#overlay'); if(!ov||!ov.classList.contains('show'))return null; const p=$('#popup'),sc=p.querySelector('.score'); return (p.classList.contains('fail')?'FAIL':'WIN')+(sc?' '+sc.textContent:''); } };
+  placeFast:(seq,cx,cy)=>{ const s=stencils.find(x=>x.seq===seq); if(!s||s.used)return false; if(active)finalizeActive(); placeStencil(s,{x:Math.round(cx)*CELL,y:Math.round(cy)*CELL}); return true; },  // simulates grabbing the next mid-spray
+  result:()=>{ const ov=$('#overlay'); if(!ov||!ov.classList.contains('show'))return null; const p=$('#popup'),sc=p.querySelector('.score'); return (p.classList.contains('fail')?'FAIL':'WIN')+(sc?' '+sc.textContent:''); },
+  dragSeq:()=>dragging?dragging.seq:-1, centerSeq:()=>carItems.length?carItems[carIndex].seq:-1, sideRect:(o)=>{ const i=carIndex+(o||1); if(i<0||i>=carItems.length)return null; const r=carItems[i].el.getBoundingClientRect(); return {seq:carItems[i].seq,x:r.x+r.width/2,y:r.y+r.height/2}; } };
 // ---------- developer mode: top-left toggle + jump between stages ----------
 (function(){ const TOTAL=30, id=(typeof STAGE!=='undefined'&&STAGE.id)||1, dev=$('#dev');
   if(localStorage.getItem('ss_dev')==='1') dev.classList.add('on');
