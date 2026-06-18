@@ -1,120 +1,122 @@
 <!doctype html><html lang="ko"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Ink Layers — 색 혼합 퍼즐 프로토타입</title>
+<title>Ink Layers — 색 혼합 퍼즐</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     background:radial-gradient(120% 90% at 50% 16%,#7fb0bd 0%,#5c93a1 60%,#4e818e 100%);}
   #wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;}
-  #title{margin-top:14px;color:#eaf6f4;font-weight:800;font-size:17px;letter-spacing:.3px;opacity:.92;}
-  #hint{color:#dcefe9;font-size:13px;margin-top:2px;opacity:.8;font-weight:600;}
-  .stars{display:flex;gap:7px;margin-top:8px;}
-  .stars b{font-size:26px;color:#cfe0dd;}.stars b.on{color:#ffc534;text-shadow:0 2px 0 #e0921f;}
-  #target{margin-top:10px;text-align:center;}
-  #target .lab{color:#eaf6f4;font-size:12px;font-weight:700;opacity:.8;margin-bottom:4px;}
-  #target canvas{width:150px;height:150px;border-radius:18px;background:#fff;box-shadow:0 8px 18px rgba(0,0,0,.22),inset 0 0 0 3px rgba(0,0,0,.05);}
+  #top{margin-top:12px;display:flex;flex-direction:column;align-items:center;gap:3px;}
+  #stageName{color:#eaf6f4;font-weight:800;font-size:18px;}
+  #stageNo{color:#cfe6e1;font-size:12px;font-weight:700;opacity:.85;}
+  .stars{display:flex;gap:7px;margin-top:5px;}
+  .stars b{font-size:24px;color:#bcd3cf;}.stars b.on{color:#ffc534;text-shadow:0 2px 0 #e0921f;}
+  #target{margin-top:9px;text-align:center;}
+  #target .lab{color:#eaf6f4;font-size:11px;font-weight:700;opacity:.8;margin-bottom:3px;letter-spacing:.5px;}
+  #tcv{width:138px;height:138px;border-radius:16px;background:#fff;box-shadow:0 8px 16px rgba(0,0,0,.22),inset 0 0 0 3px rgba(0,0,0,.05);}
   #boardWrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;}
-  #board{width:330px;height:330px;border-radius:30px;background:#fff;box-shadow:0 16px 34px rgba(0,0,0,.26),inset 0 0 0 4px rgba(0,0,0,.05);}
-  #tray{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap;justify-content:center;padding:0 14px;}
-  .ink{width:70px;height:84px;border-radius:18px;background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.3);
+  #board{width:320px;height:320px;border-radius:28px;background:#fff;box-shadow:0 16px 32px rgba(0,0,0,.26),inset 0 0 0 4px rgba(0,0,0,.05);}
+  #hint{color:#dcefe9;font-size:12px;opacity:.8;font-weight:600;margin:-4px 0 6px;}
+  #tray{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;padding:0 12px;}
+  .ink{width:64px;height:78px;border-radius:16px;background:rgba(255,255,255,.16);border:2px solid rgba(255,255,255,.3);
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;transition:transform .1s;}
-  .ink:active{transform:scale(.92);}
-  .ink .dot{width:40px;height:40px;border-radius:50%;box-shadow:inset 0 -3px 6px rgba(0,0,0,.15),0 2px 5px rgba(0,0,0,.2);}
-  .ink .nm{color:#fff;font-size:12px;font-weight:800;}
-  .ink.used{opacity:.45;}
-  .ink.used .nm::after{content:' ✓';}
-  #bar{display:flex;gap:10px;margin-bottom:12px;}
-  .btn{padding:11px 22px;border:none;border-radius:22px;font-size:16px;font-weight:800;color:#fff;cursor:pointer;
-    background:linear-gradient(180deg,#56c294,#2f9e7e);box-shadow:0 5px 0 #237a61;}
+  .ink:active{transform:scale(.9);}
+  .ink .dot{width:36px;height:36px;border-radius:50%;box-shadow:inset 0 -3px 6px rgba(0,0,0,.15),0 2px 5px rgba(0,0,0,.2);}
+  .ink .nm{color:#fff;font-size:11px;font-weight:800;}
+  .ink.used{opacity:.4;}.ink.used .nm::after{content:' ✓';}
+  #bar{display:flex;gap:9px;margin-bottom:12px;}
+  .btn{padding:10px 20px;border:none;border-radius:20px;font-size:15px;font-weight:800;color:#fff;cursor:pointer;background:linear-gradient(180deg,#56c294,#2f9e7e);box-shadow:0 5px 0 #237a61;}
   .btn.alt{background:linear-gradient(180deg,#f0a64e,#e0822f);box-shadow:0 5px 0 #b5651f;}
   .btn:active{transform:translateY(3px);box-shadow:0 2px 0 #237a61;}
-  #toast{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) scale(.8);opacity:0;pointer-events:none;z-index:20;
-    background:rgba(40,55,60,.94);color:#fff;font-weight:800;font-size:20px;padding:14px 26px;border-radius:30px;white-space:nowrap;}
-  #toast.show{animation:tp 1.3s ease forwards;}
+  #toast{position:fixed;left:50%;top:48%;transform:translate(-50%,-50%) scale(.8);opacity:0;pointer-events:none;z-index:20;background:rgba(40,55,60,.94);color:#fff;font-weight:800;font-size:18px;padding:13px 24px;border-radius:28px;white-space:nowrap;}
+  #toast.show{animation:tp 1.2s ease forwards;}
   @keyframes tp{0%{opacity:0;transform:translate(-50%,-50%) scale(.8);}14%{opacity:1;transform:translate(-50%,-60%) scale(1.05);}24%{transform:translate(-50%,-62%) scale(1);}76%{opacity:1;}100%{opacity:0;transform:translate(-50%,-72%) scale(.95);}}
   #win{position:fixed;inset:0;background:rgba(20,30,30,.6);display:none;align-items:center;justify-content:center;z-index:30;}
   #win.show{display:flex;}
-  #winCard{background:linear-gradient(180deg,#fffef9,#fff5e9);border-radius:34px;padding:30px 36px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,.4);}
-  #winCard h2{color:#2f9e7e;font-size:30px;margin:6px 0;}
-  #winCard p{color:#7a8a86;font-weight:700;margin-bottom:12px;}
-  #winCard .stars b{font-size:46px;}
+  #winCard{background:linear-gradient(180deg,#fffef9,#fff5e9);border-radius:32px;padding:26px 34px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,.4);}
+  #winCard h2{color:#2f9e7e;font-size:28px;margin:4px 0;}
+  #winCard p{color:#7a8a86;font-weight:700;margin-bottom:14px;}
+  #winCard .stars b{font-size:42px;}
 </style></head>
 <body>
 <div id="wrap">
-  <div id="title">Ink Layers — 색을 겹쳐 목표를 만들어라</div>
-  <div id="hint">잉크를 탭하면 칠해져요. 겹치면 색이 섞입니다. 필요한 잉크만 고르세요!</div>
-  <div class="stars" id="starbar"><b class="on">★</b><b class="on">★</b><b class="on">★</b></div>
-  <div id="target"><div class="lab">목표</div><canvas id="tcv" width="300" height="300"></canvas></div>
+  <div id="top">
+    <div id="stageName"></div><div id="stageNo"></div>
+    <div class="stars" id="starbar"></div>
+  </div>
+  <div id="target"><div class="lab">목표 (TARGET)</div><canvas id="tcv" width="300" height="300"></canvas></div>
   <div id="boardWrap"><canvas id="board" width="660" height="660"></canvas></div>
+  <div id="hint">잉크를 탭 → 칠해짐. 겹치면 색이 섞여요. 목표와 똑같이!</div>
   <div id="tray"></div>
-  <div id="bar"><button class="btn alt" id="undo">↩ 되돌리기</button><button class="btn" id="reset">처음부터</button></div>
+  <div id="bar"><button class="btn alt" id="undo">↩ 되돌리기</button><button class="btn alt" id="reset">처음부터</button></div>
 </div>
 <div id="toast"></div>
-<div id="win"><div id="winCard"><div class="stars" id="winStars"></div><h2 id="winTitle">완성!</h2><p id="winSub"></p><button class="btn" id="again">다시</button></div></div>
+<div id="win"><div id="winCard"><div class="stars" id="winStars"></div><h2 id="winTitle"></h2><p id="winSub"></p><button class="btn" id="next"></button></div></div>
 <script>
 const $=s=>document.querySelector(s);
-// ---- INKS: id, display name, color (multiply over white), and the shape it sprays through ----
-// shapes are circles on a 660x660 board, arranged so they OVERLAP -> mixing.
-const CX=330, R=142;
-const INKS=[
-  {id:'Y', nm:'Yellow',  col:[255,221,51],  cx:330, cy:235},   // top — underlies both overlaps
-  {id:'C', nm:'Cyan',    col:[64,201,224],  cx:243, cy:392},   // lower-left  (Y∩C = green)
-  {id:'M', nm:'Magenta', col:[232,70,150],  cx:417, cy:392},   // lower-right (Y∩M = orange)
-  {id:'K', nm:'Indigo',  col:[70,80,180],   cx:330, cy:520},   // DECOY — its solo crescent (bottom) is NOT in the target
+// Each ink: id, name, color (multiply over white), circle (cx,cy,r) on 660 board. solution = ink ids that make the target.
+const STAGES=[
+  { name:'두 색 섞기', sol:['Y','C'], inks:[
+    {id:'Y',nm:'Yellow',col:[255,221,51], cx:330,cy:268,r:150},
+    {id:'C',nm:'Cyan',  col:[64,201,224],cx:330,cy:400,r:150} ]},
+  { name:'세 가지 잉크', sol:['Y','C','M'], inks:[
+    {id:'Y',nm:'Yellow', col:[255,221,51], cx:330,cy:238,r:145},
+    {id:'C',nm:'Cyan',   col:[64,201,224],cx:245,cy:398,r:145},
+    {id:'M',nm:'Magenta',col:[232,70,150],cx:415,cy:398,r:145} ]},
+  { name:'함정을 피해', sol:['Y','C','M'], inks:[
+    {id:'Y',nm:'Yellow', col:[255,221,51], cx:330,cy:230,r:140},
+    {id:'C',nm:'Cyan',   col:[64,201,224],cx:243,cy:388,r:140},
+    {id:'M',nm:'Magenta',col:[232,70,150],cx:417,cy:388,r:140},
+    {id:'B',nm:'Indigo', col:[72,84,184], cx:330,cy:520,r:140} ]},   // decoy: solo crescent at bottom
+  { name:'필요한 것만', sol:['Y','M'], inks:[
+    {id:'Y',nm:'Yellow', col:[255,221,51], cx:280,cy:300,r:150},
+    {id:'M',nm:'Magenta',col:[232,70,150],cx:400,cy:300,r:150},      // Y∩M = orange
+    {id:'C',nm:'Cyan',   col:[64,201,224],cx:280,cy:470,r:120},      // decoy
+    {id:'B',nm:'Indigo', col:[72,84,184], cx:400,cy:470,r:120} ]},   // decoy
+  { name:'정확히 골라', sol:['Y','C','R'], inks:[
+    {id:'Y',nm:'Yellow', col:[255,221,51], cx:330,cy:235,r:140},
+    {id:'C',nm:'Cyan',   col:[64,201,224],cx:235,cy:400,r:140},      // Y∩C green
+    {id:'R',nm:'Red',    col:[235,84,66],  cx:425,cy:400,r:140},     // Y∩R orange-red
+    {id:'M',nm:'Magenta',col:[232,70,150],cx:330,cy:300,r:120},      // decoy (centre)
+    {id:'B',nm:'Indigo', col:[72,84,184], cx:330,cy:520,r:130} ]},   // decoy (bottom)
 ];
-// SOLUTION: the target is made of Yellow + Cyan + Magenta (NOT the indigo decoy).
-const SOLUTION=['Y','C','M'];
-
-const board=$('#board'), bx=board.getContext('2d');
-const tcv=$('#tcv'), tx=tcv.getContext('2d');
-let applied=[], mistakes=0;
-
-function paintInks(ctx, ids, scale){
-  ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,ctx.canvas.width,ctx.canvas.height);
-  // faint outlines of ALL ink shapes (so the player can see the zones) — only on the board
-  if(scale===1 && ctx===bx){
-    for(const ink of INKS){ ctx.save(); ctx.beginPath(); ctx.arc(ink.cx,ink.cy,R,0,7);
-      ctx.strokeStyle='rgba(0,0,0,0.08)'; ctx.lineWidth=2; ctx.setLineDash([8,8]); ctx.stroke(); ctx.restore(); }
-  }
+let si=0, applied=[], mistakes=0, S=STAGES[0];
+const board=$('#board'), bx=board.getContext('2d'), tcv=$('#tcv'), tx=tcv.getContext('2d');
+function paint(ctx, inks, ids, scale, outlines){
+  const w=ctx.canvas.width; ctx.clearRect(0,0,w,w); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,w);
+  if(outlines){ for(const k of inks){ ctx.save(); ctx.beginPath(); ctx.arc(k.cx*scale,k.cy*scale,k.r*scale,0,7);
+    ctx.strokeStyle='rgba(0,0,0,0.08)'; ctx.lineWidth=2; ctx.setLineDash([7,7]); ctx.stroke(); ctx.restore(); } }
   ctx.save(); ctx.globalCompositeOperation='multiply';
-  for(const id of ids){ const ink=INKS.find(k=>k.id===id); if(!ink)continue;
-    ctx.beginPath(); ctx.arc(ink.cx*scale,ink.cy*scale,R*scale,0,7);
-    ctx.fillStyle=`rgb(${ink.col[0]},${ink.col[1]},${ink.col[2]})`; ctx.fill(); }
+  for(const id of ids){ const k=inks.find(x=>x.id===id); if(!k)continue; ctx.beginPath(); ctx.arc(k.cx*scale,k.cy*scale,k.r*scale,0,7);
+    ctx.fillStyle=`rgb(${k.col.join(',')})`; ctx.fill(); }
   ctx.restore();
 }
-function drawTarget(){ paintInks(tx, SOLUTION, 300/660); }
-function redraw(){ paintInks(bx, applied, 1); }
-function buildTray(){
-  const t=$('#tray'); t.innerHTML='';
-  for(const ink of INKS){
-    const el=document.createElement('div'); el.className='ink'+(applied.includes(ink.id)?' used':'');
-    el.innerHTML=`<div class="dot" style="background:rgb(${ink.col.join(',')})"></div><div class="nm">${ink.nm}</div>`;
-    el.onclick=()=>tap(ink.id); t.appendChild(el);
-  }
-}
-function toast(msg){ const e=$('#toast'); e.textContent=msg; e.classList.remove('show'); void e.offsetWidth; e.classList.add('show'); }
-function updateStars(){ const cur=Math.max(1,3-mistakes); document.querySelectorAll('#starbar b').forEach((b,i)=>b.classList.toggle('on',i<cur)); }
-function tap(id){
-  if(applied.includes(id)) return;
-  applied.push(id);
-  if(!SOLUTION.includes(id)){ mistakes++; updateStars(); toast('이 잉크는 안 들어가요 🙂'); if(navigator.vibrate)navigator.vibrate([10,40,10]); }
-  buildTray(); redraw(); check();
-}
-function setEq(a,b){ return a.length===b.length && a.every(x=>b.includes(x)); }
-function check(){
-  if(setEq(applied, SOLUTION)){
-    const stars=Math.max(1,3-mistakes);
-    $('#winStars').innerHTML=[0,1,2].map(i=>`<b class="${i<stars?'on':''}">★</b>`).join('');
-    $('#winSub').textContent = mistakes===0?'딱 맞는 잉크만! 색을 정확히 읽었어요.':`${mistakes}번 잘못 섞었어요`;
-    $('#winTitle').textContent = mistakes===0?'Perfect!':'완성!';
-    setTimeout(()=>$('#win').classList.add('show'),350);
-  }
-}
+function drawTarget(){ paint(tx, S.inks, S.sol, 300/660, false); }
+function redraw(){ paint(bx, S.inks, applied, 1, true); }
+function buildTray(){ const t=$('#tray'); t.innerHTML='';
+  for(const k of S.inks){ const el=document.createElement('div'); el.className='ink'+(applied.includes(k.id)?' used':'');
+    el.innerHTML=`<div class="dot" style="background:rgb(${k.col.join(',')})"></div><div class="nm">${k.nm}</div>`;
+    el.onclick=()=>tap(k.id); t.appendChild(el); } }
+function toast(m){ const e=$('#toast'); e.textContent=m; e.classList.remove('show'); void e.offsetWidth; e.classList.add('show'); }
+function stars(){ return Math.max(1,3-mistakes); }
+function updateStars(){ const c=stars(); $('#starbar').innerHTML=[0,1,2].map(i=>`<b class="${i<c?'on':''}">★</b>`).join(''); }
+function loadStage(i){ si=i; S=STAGES[i]; applied=[]; mistakes=0;
+  $('#stageName').textContent=S.name; $('#stageNo').textContent=`STAGE ${i+1} / ${STAGES.length}`;
+  $('#win').classList.remove('show'); updateStars(); drawTarget(); buildTray(); redraw(); }
+const setEq=(a,b)=>a.length===b.length&&a.every(x=>b.includes(x));
+function tap(id){ if(applied.includes(id))return; applied.push(id);
+  if(!S.sol.includes(id)){ mistakes++; updateStars(); toast('이 잉크는 안 들어가요 🙂'); if(navigator.vibrate)navigator.vibrate([10,40,10]); }
+  buildTray(); redraw();
+  if(setEq(applied,S.sol)){ const st=stars(), last=si>=STAGES.length-1;
+    $('#winStars').innerHTML=[0,1,2].map(i=>`<b class="${i<st?'on':''}">★</b>`).join('');
+    $('#winTitle').textContent= st===3?'Perfect!':'완성!';
+    $('#winSub').textContent= mistakes===0?'딱 맞는 잉크만 골랐어요!':`${mistakes}번 잘못 섞음`;
+    $('#next').textContent= last?'처음부터':'다음 ▶';
+    $('#next').onclick=()=>loadStage(last?0:si+1);
+    setTimeout(()=>$('#win').classList.add('show'),360); } }
 $('#undo').onclick=()=>{ if(!applied.length)return; applied.pop(); buildTray(); redraw(); };
-$('#reset').onclick=()=>{ applied=[]; mistakes=0; updateStars(); buildTray(); redraw(); };
-$('#again').onclick=()=>{ $('#win').classList.remove('show'); applied=[]; mistakes=0; updateStars(); buildTray(); redraw(); };
-drawTarget(); buildTray(); redraw();
-window.__qa={ tap:(id)=>tap(id), state:()=>({applied:[...applied],mistakes,won:$('#win').classList.contains('show')}) };
+$('#reset').onclick=()=>loadStage(si);
+loadStage(0);
+window.__qa={ tap:id=>tap(id), load:i=>loadStage(i), state:()=>({si,applied:[...applied],mistakes,won:$('#win').classList.contains('show')}), n:()=>STAGES.length };
 </script>
 </body></html>
