@@ -444,21 +444,15 @@ function buildStepMasks(){
     for(let j=i+1;j<order.length;j++) g.drawImage(maskImgs[order[j].seq],0,0,W,H);   // subtract foreground layers drawn on top
     g.globalCompositeOperation='source-over'; stepMaskCv[i]=c; }
 }
-function buildStepSheet(){   // BEIGE textured CARD stencil with DEPTH; its ONLY hole is the CURRENT layer (maskCv)
-  sheetCtx.clearRect(0,0,W,H); sheetCtx.fillStyle='#d3c39a'; roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.fill();
+function buildStepSheet(){   // BEIGE strongly-textured CARD stencil; ONLY hole = current layer (maskCv). NO inner/outer lines.
+  sheetCtx.clearRect(0,0,W,H); sheetCtx.fillStyle='#cdbd92'; roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.fill();
   sheetCtx.save(); roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.clip();
-  if(paperTexImg){ sheetCtx.globalCompositeOperation='multiply'; sheetCtx.globalAlpha=0.85; sheetCtx.drawImage(paperTexImg,0,0,W,H); sheetCtx.globalAlpha=1; sheetCtx.globalCompositeOperation='source-over'; }   // CLEAR paper-card grain (distinct from the smooth white paper below)
-  sheetCtx.globalAlpha=0.10; for(let i=0;i<1100;i++){ sheetCtx.fillStyle=(i&1)?'#9d8f6a':'#efe8d2'; sheetCtx.fillRect(Math.random()*W,Math.random()*H,2,2);} sheetCtx.globalAlpha=1;
-  const sg=sheetCtx.createLinearGradient(0,0,0,H); sg.addColorStop(0,'rgba(255,251,238,.36)'); sg.addColorStop(.45,'rgba(255,255,255,0)'); sg.addColorStop(1,'rgba(74,62,38,.22)');
-  sheetCtx.fillStyle=sg; sheetCtx.fillRect(0,0,W,H); sheetCtx.restore();                                  // lit-from-top surface shading
-  sheetCtx.globalCompositeOperation='destination-out'; sheetCtx.drawImage(maskCv,0,0); sheetCtx.globalCompositeOperation='source-over';   // punch the current layer's hole
-  // BEVEL: thick-card depth around each hole — dark rim hugging the cut, faint light lip just inside the card
-  const R=Math.max(3,Math.round(W*0.014));
-  const ring=morphCv(), rgc=ring.getContext('2d'); rgc.drawImage(dilateCv(maskCv,R),0,0);
-  rgc.globalCompositeOperation='destination-out'; rgc.drawImage(maskCv,0,0); rgc.globalCompositeOperation='source-over';   // ring on the card hugging the hole
-  const rimT=morphCv(), rt=rimT.getContext('2d'); rt.drawImage(ring,0,0); rt.globalCompositeOperation='source-in'; rt.fillStyle='#6f6246'; rt.fillRect(0,0,W,H);
-  sheetCtx.globalCompositeOperation='source-atop'; sheetCtx.globalAlpha=0.6; sheetCtx.drawImage(rimT,0,0); sheetCtx.globalAlpha=1; sheetCtx.globalCompositeOperation='source-over';
-  // (no dark outer outline — the beige card edge meets the paper cleanly)
+  if(paperTexImg){ sheetCtx.globalCompositeOperation='multiply'; sheetCtx.drawImage(paperTexImg,0,0,W,H);
+    sheetCtx.globalCompositeOperation='overlay'; sheetCtx.globalAlpha=0.55; sheetCtx.drawImage(paperTexImg,0,0,W,H); sheetCtx.globalAlpha=1; sheetCtx.globalCompositeOperation='source-over'; }   // STRONG paper grain (multiply + overlay)
+  sheetCtx.globalAlpha=0.20; for(let i=0;i<2600;i++){ const v=i%3; sheetCtx.fillStyle=v===0?'#827448':v===1?'#b3a37a':'#f4eeda'; const s=1+(i%3); sheetCtx.fillRect(Math.random()*W,Math.random()*H,s,s);} sheetCtx.globalAlpha=1;   // dense fibrous grain -> clearly reads as paper
+  const sg=sheetCtx.createLinearGradient(0,0,0,H); sg.addColorStop(0,'rgba(255,251,238,.34)'); sg.addColorStop(.45,'rgba(255,255,255,0)'); sg.addColorStop(1,'rgba(74,62,38,.24)');
+  sheetCtx.fillStyle=sg; sheetCtx.fillRect(0,0,W,H); sheetCtx.restore();
+  sheetCtx.globalCompositeOperation='destination-out'; sheetCtx.drawImage(maskCv,0,0); sheetCtx.globalCompositeOperation='source-over';   // punch the hole — clean cut, no rim/line
 }
 function prepStep(i){   // current disjoint region mask (clip + hole) + its black sheet
   stepIdx=i; const s=order[i]; active=s;
