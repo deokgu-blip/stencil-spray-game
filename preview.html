@@ -97,12 +97,12 @@
   #galHead{position:absolute;top:30px;left:0;width:100%;text-align:center;font-size:62px;font-weight:700;color:#5b7b86;z-index:2;}
   #ggrid{position:absolute;inset:120px 0 0 0;overflow-y:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:46px 26px;padding:34px 34px 170px;align-content:start;}
   .gmemo{position:relative;display:flex;flex-direction:column;align-items:center;}
-  .gpaper{position:relative;width:100%;aspect-ratio:1;border-radius:10px;background:#fbf4e2;box-shadow:0 12px 22px rgba(40,55,55,.28),inset 0 0 0 2px rgba(120,98,60,.12);transform:rotate(var(--rot,0deg));overflow:hidden;display:flex;align-items:center;justify-content:center;}
+  .gpaper{position:relative;width:100%;aspect-ratio:3/4;border-radius:10px;background:#fbf4e2;box-shadow:0 12px 22px rgba(40,55,55,.28),inset 0 0 0 2px rgba(120,98,60,.12);transform:rotate(var(--rot,0deg));overflow:hidden;display:flex;align-items:center;justify-content:center;}
   body.paperui .gpaper{background:var(--ptex) center/cover;}
-  .gpaper img{width:90%;height:90%;object-fit:contain;}
+  .gpaper img{width:92%;height:92%;object-fit:contain;}
   .gmemo.empty .gpaper{box-shadow:0 10px 18px rgba(40,55,55,.22),inset 0 0 0 2px rgba(120,98,60,.12),inset 0 0 30px rgba(120,98,60,.12);}
-  .gpin{position:absolute;top:-20px;left:50%;width:52px;height:52px;z-index:3;transform:translateX(-50%) rotate(var(--rot,0deg));filter:drop-shadow(0 5px 6px rgba(0,0,0,.32));pointer-events:none;}
-  .gname{margin-top:20px;font-size:36px;font-weight:700;color:#6b5f4a;text-align:center;line-height:1.05;}
+  .gpin{position:absolute;top:-18px;left:50%;width:46px;height:46px;z-index:3;transform:translateX(-50%) rotate(var(--rot,0deg));filter:drop-shadow(0 5px 6px rgba(0,0,0,.32));pointer-events:none;}
+  .gname{margin-top:10px;font-size:22px;font-weight:700;color:#6b5f4a;text-align:center;white-space:nowrap;}
   .gmemo.empty .gname{color:#9a8f7c;opacity:.75;}
   #galBack{position:fixed;left:28px;bottom:36px;z-index:66;font-size:42px;font-weight:700;color:#fff;background:linear-gradient(180deg,#7fb0a0,#5b8f7e);border:none;border-radius:28px;padding:18px 46px;box-shadow:0 8px 0 #3f6c5c,0 12px 20px rgba(0,0,0,.22);cursor:pointer;}
   #galBack:active{transform:translateY(5px);box-shadow:0 3px 0 #3f6c5c;}
@@ -1016,7 +1016,7 @@ let rseed=1; function rand(){ rseed=(rseed*1103515245+12345)&0x7fffffff; return 
 function saveToGallery(pic){ try{ const g=JSON.parse(localStorage.getItem('ss_gallery')||'{}'); g[STAGE.id||1]={pic,name:STAGE.name||''}; localStorage.setItem('ss_gallery',JSON.stringify(g)); }catch(e){} }
 function galleryCount(){ try{ return Object.keys(JSON.parse(localStorage.getItem('ss_gallery')||'{}')).length; }catch(e){ return 0; } }
 // temporary picture names per stage (stages aren't defined yet) — stage 1 is the real one
-const GALLERY_NAMES=['Lighthouse & Moon','Sleepy Fox','Ocean Whale','Night Owl','Cozy Cabin','Hot-Air Balloon','Little Sailboat','Mountain Cat','Starry Pine','Paper Lantern','Autumn Deer','Snowy Bear'];
+const GALLERY_NAMES=['Lighthouse','Fox','Whale','Owl','Cabin','Balloon','Sailboat','Cat','Pine','Lantern','Deer','Bear'];
 function openGallery(){ let g={}; try{g=JSON.parse(localStorage.getItem('ss_gallery')||'{}');}catch(e){}
   const grid=$('#ggrid'); grid.innerHTML='';
   GALLERY_NAMES.forEach((name,i)=>{ const sid=i+1, got=g[sid];
