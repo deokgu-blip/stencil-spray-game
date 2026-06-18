@@ -47,7 +47,7 @@
   #refPin{position:absolute;top:-15px;left:50%;transform:translateX(-50%);width:38px;height:38px;z-index:3;filter:drop-shadow(0 4px 5px rgba(0,0,0,.28));pointer-events:none;}
   #refBox.zoom{transform:rotate(0deg) scale(3.2);box-shadow:0 26px 60px rgba(0,0,0,.4);cursor:zoom-out;}
   /* bottom controls gathered at the lower-right, just left of the submit check */
-  #bottom{position:absolute;left:0;right:0;bottom:96px;height:206px;z-index:5;display:flex;align-items:center;justify-content:flex-start;padding-left:8px;padding-right:200px;}
+  #bottom{position:absolute;left:0;right:0;bottom:96px;height:206px;z-index:5;display:flex;align-items:center;justify-content:flex-start;padding-left:172px;padding-right:200px;}
   #canHint{display:none;}
   /* colour CAROUSEL — swipe/drag horizontally, tap to select; centred colour emphasised */
   #cans{position:relative;flex:1 1 auto;height:198px;overflow:hidden;cursor:grab;}
@@ -66,6 +66,10 @@
   #wslider::-moz-range-thumb{width:60px;height:60px;border-radius:50%;background:#fffdf5;border:5px solid #43c08e;box-shadow:0 5px 12px rgba(0,0,0,.28);cursor:pointer;}
   #doneBtn{display:none;position:absolute;right:40px;bottom:126px;z-index:57;width:140px;height:140px;padding:0;border:none;border-radius:36px;font-size:86px;line-height:140px;font-weight:900;color:#fff;background:linear-gradient(180deg,#5fd0a0,#33a87e);box-shadow:0 10px 0 #237a61,0 16px 22px rgba(40,90,70,.34);cursor:pointer;transition:transform .1s;}
   #doneBtn:active{transform:translateY(6px);box-shadow:0 4px 0 #237a61,0 7px 12px rgba(40,90,70,.3);}
+  #prevBtn{display:none;position:absolute;left:30px;bottom:132px;z-index:57;width:114px;height:114px;padding:0;border:none;border-radius:32px;font-size:68px;line-height:114px;font-weight:900;color:#fff;background:linear-gradient(180deg,#caa37e,#a6815c);box-shadow:0 9px 0 #7c5f40,0 13px 18px rgba(40,30,20,.3);cursor:pointer;transition:transform .1s;}
+  #prevBtn.imgbtn{transform:scaleX(-1);}
+  #prevBtn:active{transform:translateY(5px);}
+  #prevBtn.imgbtn:active{transform:scaleX(-1) scale(.93);}
   #msgToast{position:fixed;left:50%;top:50%;z-index:64;pointer-events:none;opacity:0;transform:translate(-50%,-100%) scale(.8);}   /* JS sets left/top to just above the wrong tile */
   #msgToast img{width:182px;height:auto;filter:drop-shadow(0 8px 14px rgba(0,0,0,.24));}
   #msgToast.show{animation:msgPop 1.3s ease forwards;}
@@ -154,6 +158,7 @@
   <div id="bottom">
     <div id="cans"></div>
   </div>
+  <button id="prevBtn" title="undo previous">←</button>
   <button id="doneBtn" title="submit">✓</button>
   <div id="hint"></div>
   <div id="rating"><img id="ratingImg" alt=""></div>
@@ -195,6 +200,7 @@ let tutorial=!!STAGE.tutorial;
 const stencils=STAGE.stencils.map(s=>({...s,used:false}));
 const order=stencils.slice().sort((a,b)=>a.seq-b.seq);   // progressive paint order: back -> front, one stencil per step
 let stepIdx=0;
+const snapshots=[];   // paintCv state at the start of each step, for the PREV/undo button
 // carousel display order: paint order (easy) for stages 1-2, SHUFFLED from stage 3 so the player must work out the order
 // HEALING: present stencils in correct paint order (back -> front). The "next" one is gently highlighted.
 const displayOrder=stencils.slice();
@@ -240,6 +246,7 @@ function sfx(k){ if(A[k]){try{A[k].currentTime=0;A[k].play().catch(()=>{});}catc
   if(assets.sketchPopup) document.documentElement.style.setProperty('--skbg','url('+assets.sketchPopup+')');   // sketchbook result popup
   const bb=$('#bookBtn'); if(bb&&assets.btnBook){ bb.classList.add('imgbtn'); bb.style.backgroundImage='url('+assets.btnBook+')'; bb.textContent=''; }
   const gbk=$('#galBack'); if(gbk&&assets.btnNext){ gbk.classList.add('imgbtn'); gbk.style.backgroundImage='url('+assets.btnNext+')'; gbk.textContent=''; }   // small flipped NEXT arrow
+  const pv=$('#prevBtn'); if(pv){ if(assets.btnNext){ pv.classList.add('imgbtn'); pv.style.backgroundImage='url('+assets.btnNext+')'; pv.textContent=''; } pv.onclick=undoStep; }   // PREV = flipped NEXT arrow (undo)
   $('#bookBtn').onclick=openGallery; $('#galBack').onclick=()=>$('#gallery').classList.remove('show');
   $('#doneBtn').onclick=advance;
   targetImg=await loadImg(assets.target||STAGE.targetImage);
@@ -455,6 +462,7 @@ function buildStepSheet(){   // DARK warm textured CARD stencil; ONLY hole = cur
 }
 function prepStep(i){   // current disjoint region mask (clip + hole) + its black sheet
   stepIdx=i; const s=order[i]; active=s;
+  snapshots[i]=cloneCv(paintCv);   // drawing accumulated through the previous steps (for undo)
   maskCtx.clearRect(0,0,W,H); maskCtx.drawImage(stepMaskCv[i],0,0,W,H);   // maskCv = this layer's own area
   buildStepSheet();
   sweepCtx.clearRect(0,0,W,H); spParts=[]; lastFill=null; fingerDown=false;
@@ -462,7 +470,14 @@ function prepStep(i){   // current disjoint region mask (clip + hole) + its blac
 function setStepButton(){ const db=$('#doneBtn'); if(!db)return; const last=stepIdx>=order.length-1;
   if(assets.btnNext&&assets.btnDone){ db.classList.add('imgbtn'); db.style.backgroundImage='url('+(last?assets.btnDone:assets.btnNext)+')'; db.textContent=''; }
   else db.textContent=last?'✓':'→';
-  db.style.display='block'; }
+  db.style.display='block';
+  const pv=$('#prevBtn'); if(pv) pv.style.display = stepIdx>0 ? 'block':'none'; }   // PREV/undo only after step 0
+// PREV (undo): discard the current colouring, revert to before the previous stencil, and re-lay it to recolour
+function undoStep(){ if(state!=='spraying'||stepIdx<=0)return; const prev=stepIdx-1;
+  if(snapshots[prev]){ paintCtx.clearRect(0,0,W,H); paintCtx.drawImage(snapshots[prev],0,0); }
+  order[prev].used=false; order[stepIdx].used=false;
+  const pv=$('#prevBtn'); if(pv)pv.style.display='none';
+  layStep(prev); }
 async function startColoring(){
   buildMaskAll();                                   // builds linesCv (final divider lines) + unionCv
   buildStepMasks();                                 // disjoint per-layer holes
