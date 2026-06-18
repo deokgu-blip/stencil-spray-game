@@ -44,7 +44,13 @@
   .ttile{position:relative;width:246px;height:234px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s ease;-webkit-tap-highlight-color:transparent;}
   .ttile:active{transform:scale(.94);}
   .ttile img{max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 12px 18px rgba(40,60,60,.34));pointer-events:none;}
-  .ttile .redov{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;filter:none;}   /* red "wrong" overlay — exact tile footprint */
+  .ttile .redov{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;filter:none;}
+  .ttile.dim{opacity:.5;}                                   /* upcoming stencils, gently dimmed */
+  .ttile.nextup{animation:nextBob 1.6s ease-in-out infinite;}  /* the next one to spray gently bobs */
+  .ttile.nextup img{filter:drop-shadow(0 0 16px rgba(120,235,185,.95)) drop-shadow(0 12px 18px rgba(40,60,60,.34));}
+  @keyframes nextBob{0%,100%{transform:translateY(0) scale(1.05);}50%{transform:translateY(-8px) scale(1.08);}}
+  .ttile.pulse{animation:tilePulse .5s ease;}
+  @keyframes tilePulse{0%,100%{transform:scale(1.05);}40%{transform:scale(1.2);}}
   .ttile.reject{z-index:30;animation:tileReject .72s cubic-bezier(.3,.7,.3,1);}
   .ttile.reject .redov{animation:redFlash .72s ease;}
   @keyframes tileReject{0%{transform:translateY(0) scale(1);}28%{transform:translateY(-56px) scale(1.05) rotate(-1.5deg);}60%{transform:translateY(-56px) scale(1.05) rotate(1.5deg);}100%{transform:translateY(0) scale(1);}}   /* rise -> hold -> fall */
@@ -162,12 +168,9 @@ let active=null;                // current stencil
 let tutorial=!!STAGE.tutorial;
 const stencils=STAGE.stencils.map(s=>({...s,used:false}));
 // carousel display order: paint order (easy) for stages 1-2, SHUFFLED from stage 3 so the player must work out the order
-const displayOrder=(()=>{ const a=stencils.slice();
-  if((STAGE.id||1)>=3 && a.length>1){
-    for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; }
-    if(a.every((s,i)=>s===stencils[i])) a.reverse();   // never hand back the exact correct order
-  }
-  return a; })();
+// HEALING: present stencils in correct paint order (back -> front). The "next" one is gently highlighted.
+const displayOrder=stencils.slice();
+const nextStencil=()=>stencils.filter(s=>!s.used).sort((a,b)=>a.seq-b.seq)[0]||null;
 const SPRAY_R=Math.round(W*0.075);
 const PAGE_R=Math.round(W*0.07);   // rounded-corner radius of the paper page -> painting/stencil corners never look square
 const SHEET_COLOR='#2a2a30';   // matte black plastic stencil (matches the queue cards)
@@ -279,22 +282,27 @@ function computeTiles(){
 // ---------- tap-to-place TRAY: tap a stencil; it auto-places at its correct spot IF the order is valid ----------
 let carItems=[], mistakes=0;
 const isReady=s=>(s.deps||[]).every(d=>stencils.some(t=>t.seq===d&&t.used));   // every piece BEHIND it is already painted
-function buildCarousel(){   // (name kept) rebuild the tray of remaining stencils
+function buildCarousel(){   // tray of remaining stencils, in paint order; the next one glows
   const q=$('#queue'); q.innerHTML=''; carItems=displayOrder.filter(s=>!s.used);
+  const nx=nextStencil();
   carItems.forEach(s=>{
-    const el=document.createElement('div'); el.className='ttile';
+    const el=document.createElement('div'); el.className='ttile'+(nx&&s.seq===nx.seq?' nextup':' dim');
     const im=new Image(); im.src=s.tileURL; el.appendChild(im); s.el=el;
-    const rv=new Image(); rv.className='redov'; rv.src=s.tileRedURL; el.appendChild(rv);   // red wrong-overlay, exact same footprint
     el.addEventListener('click',()=>tryPlace(s));
     q.appendChild(el);
   });
-  $('#queueLabel').textContent = carItems.length ? 'Tap a stencil to spray it on' : '';
+  $('#queueLabel').textContent = carItems.length ? '반짝이는 스텐실을 탭하세요' : '';
 }
-function tryPlace(s){   // HEALING: any order works, no fail — just tap and enjoy
-  if(s.used || !(state==='idle'||state==='spraying'||state==='peeling')) return;
-  if(active) finalizeActive();                     // finish the previous spray/peel instantly
-  placeStencil(s,{x:0,y:0});                        // auto-place at the correct position
+function tryPlace(s){   // HEALING: gentle guided order (next one only), no fail
+  if(s.used || state!=='idle') return;
+  const nx=nextStencil();
+  if(nx && s.seq!==nx.seq){ if(nx.el){ nx.el.classList.remove('pulse'); void nx.el.offsetWidth; nx.el.classList.add('pulse'); } return; }   // gently point to the next one
+  placeStencil(s,{x:0,y:0});
 }
+// HOLD-to-spray: the sheet is laid down, then you press & hold to actually spray it on (the "doing")
+window.addEventListener('pointerdown',e=>{ if(state==='spraying'){ pressing=true; ensureDraw(); } },{passive:true});
+window.addEventListener('pointerup',()=>{ pressing=false; });
+window.addEventListener('pointercancel',()=>{ pressing=false; });
 function rejectTile(s){
   mistakes++; updateStars();
   if(s.el){ s.el.classList.remove('reject'); void s.el.offsetWidth; s.el.classList.add('reject'); }   // rise -> turn red -> fall
@@ -396,10 +404,9 @@ function placeStencil(s,offset){
   buildSprayZone();
   buildHoleInk();           // solid through-hole ink, ready so the spray can progressively reveal it
   buildSheetBase();
-  sfx('chak'); if(navigator.vibrate)navigator.vibrate(16);
-  startSpray();   // dragged into place already -> straight to spray (no extra drop animation)
-  // advance the queue NOW (don't wait for spray/peel): this stencil leaves, the next centres+enlarges & is grabbable
-  s.used=true; buildCarousel(); updateStars();
+  state='spraying';         // block re-entry while it lays down + sprays
+  s.used=true; buildCarousel();   // advance tray now (the next stencil glows)
+  layStencil();             // the sheet drops in & COVERS the picture, then wait for press-to-spray
 }
 async function layStencil(){
   const x0=active.home.x+placeOffset.x, y0=active.home.y+placeOffset.y, bw=active.box.w, bh=active.box.h, cx=x0+bw/2, cy=y0+bh/2;
@@ -423,6 +430,7 @@ function buildSheetBase(){
 
 // ---------- auto spray (zigzag TL -> BR) ----------
 let sprayStart=0, sprayDur=1050, lastDab={x:0,y:0,has:false};
+let pressing=false, sprayHeld=0, sprayLastT=0;   // HOLD-to-spray: progress only while the finger presses
 let dabStamp=null, splatCol='#000';
 function buildDabStamp(){   // pre-bake the radial spray dab so the hot loop allocates nothing
   const R=SPRAY_R, d=Math.ceil(R*2); dabStamp=document.createElement('canvas'); dabStamp.width=d; dabStamp.height=d; const c=dabStamp.getContext('2d');
@@ -431,10 +439,10 @@ function buildDabStamp(){   // pre-bake the radial spray dab so the hot loop all
   splatCol=hexA(active.color,1);
 }
 function startSpray(){
-  state='spraying'; sprayT=0; lastDab.has=false; nozzle.show=true;
+  state='spraying'; sprayT=0; sprayHeld=0; pressing=false; sprayLastT=performance.now(); lastDab.has=false; nozzle.show=false;
   buildDabStamp();
-  loopOn(A.spray,0.55);
-  sprayStart=performance.now(); ensureDraw();
+  setHint('꾹 눌러서 분사! ✨');
+  ensureDraw();
 }
 // Spray sweeps the WHOLE stencil sheet messily (ink lands all over the stencil, not just around holes); all holes get filled.
 function buildSprayZone(){
@@ -484,7 +492,10 @@ function buildHoleInk(){   // clean solid colour through every hole of the curre
   holeInkCtx.globalCompositeOperation='destination-in'; holeInkCtx.drawImage(maskCv,0,0); holeInkCtx.globalCompositeOperation='source-over';
 }
 function stepSpray(now){
-  sprayT=Math.min(1,(now-sprayStart)/sprayDur);
+  const dt=Math.min(64, now-sprayLastT); sprayLastT=now;
+  if(!pressing){ if(nozzle.show){ nozzle.show=false; loopOff(A.spray); } return; }   // paused until pressed
+  if(!nozzle.show){ nozzle.show=true; loopOn(A.spray,0.55); setHint(''); }
+  sprayHeld+=dt; sprayT=Math.min(1, sprayHeld/sprayDur);
   const target=pathPoint(sprayT);
   // interpolate dabs from last point to target for continuous stroke
   if(!lastDab.has){ lastDab={x:target.x,y:target.y,has:true}; dab(target.x,target.y); }
@@ -527,9 +538,7 @@ function animatePeelTo(tgt,cb,dur){ dur=dur||300; const from=peel,t0=performance
 function commitActive(rate){   // burn the current stencil's clean through-hole ink onto the painting
   if(!active)return;
   active.layerCv=cloneCv(holeInkCv); active.scoreCenter=bboxCenter(holeInkCv);
-  // HEALING: recomposite ALL placed layers in correct paint order -> any TAP order still yields the right picture
-  paintCtx.clearRect(0,0,W,H);
-  stencils.filter(s=>s.used&&s.layerCv).sort((a,b)=>a.seq-b.seq).forEach(s=>paintCtx.drawImage(s.layerCv,0,0));
+  paintCtx.drawImage(holeInkCv,0,0);   // natural layering: each new stencil COVERS what's under it (no reorder)
   if(rate && navigator.vibrate)navigator.vibrate([8,24,8]);
   active=null;
 }
@@ -772,6 +781,8 @@ function setHint(t){ const h=$('#hint'); if(!t){h.classList.add('hide');return;}
 
 // ---------- QA hooks (harmless in normal play) ----------
 window.__qa={ state:()=>state,
+  press:(v)=>{ pressing=(v!==false); ensureDraw(); },   // simulate press-&-hold to spray
+  tapNext:()=>{ const n=nextStencil(); if(n)tryPlace(n); return n?n.seq:-1; },
   tap:(seq)=>{ const s=stencils.find(x=>x.seq===seq); if(!s||s.used)return 'gone'; const m0=mistakes; tryPlace(s); return s.used?'placed':(mistakes>m0?'rejected':'busy'); },  // simulate tapping a tray tile
   place:(seq)=>{ const s=stencils.find(x=>x.seq===seq); if(!s||s.used)return false; tryPlace(s); return s.used; },  // place if order is valid
   ready:(seq)=>{ const s=stencils.find(x=>x.seq===seq); return !!s&&isReady(s); },
