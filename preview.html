@@ -137,6 +137,7 @@ let active=null;                // current stencil
 let tutorial=!!STAGE.tutorial;
 const stencils=STAGE.stencils.map(s=>({...s,used:false}));
 const SPRAY_R=Math.round(W*0.075);
+const PAGE_R=Math.round(W*0.07);   // rounded-corner radius of the paper page -> painting/stencil corners never look square
 const SHEET_COLOR='#2a2a30';   // matte black plastic stencil (matches the queue cards)
 // ---- drag-to-place grid (Option A: position is part of the puzzle) ----
 const GRID=20, CELL=W/GRID;            // fine grid the stencil snaps to
@@ -400,7 +401,7 @@ let sprayStart=0, lastDab={x:0,y:0,has:false};
 let dabStamp=null, splatCol='#000';
 function buildDabStamp(){   // pre-bake the radial spray dab so the hot loop allocates nothing
   const R=SPRAY_R, d=Math.ceil(R*2); dabStamp=document.createElement('canvas'); dabStamp.width=d; dabStamp.height=d; const c=dabStamp.getContext('2d');
-  const g=c.createRadialGradient(R,R,1,R,R,R); g.addColorStop(0,hexA(active.color,1)); g.addColorStop(0.6,hexA(active.color,0.85)); g.addColorStop(1,hexA(active.color,0));
+  const g=c.createRadialGradient(R,R,1,R,R,R); g.addColorStop(0,hexA(active.color,1)); g.addColorStop(0.72,hexA(active.color,0.97)); g.addColorStop(0.9,hexA(active.color,0.7)); g.addColorStop(1,hexA(active.color,0));
   c.fillStyle=g; c.beginPath(); c.arc(R,R,R,0,7); c.fill();
   splatCol=hexA(active.color,1);
 }
@@ -415,7 +416,7 @@ function buildSprayZone(){
   const x0=Math.max(0,active.home.x+placeOffset.x), y0=Math.max(0,active.home.y+placeOffset.y);
   const x1=Math.min(W,active.home.x+placeOffset.x+active.box.w), y1=Math.min(H,active.home.y+placeOffset.y+active.box.h);
   sprayBox={ x0, y0, x1, y1 };
-  sprayRows=Math.max(7, Math.round((y1-y0)/(SPRAY_R*0.5)));     // dense rows -> solid messy coverage over the whole sheet
+  sprayRows=Math.max(8, Math.round((y1-y0)/(SPRAY_R*0.42)));     // dense rows -> solid messy coverage over the whole sheet
   dilatedCtx.clearRect(0,0,W,H); dilatedCtx.fillStyle='#fff'; roundRect(dilatedCtx,x0,y0,x1-x0,y1-y0,20); dilatedCtx.fill();
 }
 // serpentine path within the spray box (top-left -> bottom-right of the box)
@@ -430,8 +431,8 @@ function pathPoint(p){
 }
 function dab(x,y){
   // irregular core via the pre-baked stamp (no gradient allocation in the hot loop -> no GC jank)
-  const r=SPRAY_R*(0.5+Math.random()*0.7);
-  sweepCtx.globalAlpha=0.55+Math.random()*0.4;
+  const r=SPRAY_R*(0.62+Math.random()*0.65);
+  sweepCtx.globalAlpha=0.8+Math.random()*0.2;
   sweepCtx.drawImage(dabStamp, x-r, y-r, r*2, r*2);
   // a few dirty splatter specks
   sweepCtx.fillStyle=splatCol;
@@ -446,7 +447,7 @@ function stepSpray(now){
   // interpolate dabs from last point to target for continuous stroke
   if(!lastDab.has){ lastDab={x:target.x,y:target.y,has:true}; dab(target.x,target.y); }
   else{
-    const dx=target.x-lastDab.x, dy=target.y-lastDab.y, dist=Math.hypot(dx,dy), stepN=Math.max(1,Math.floor(dist/(SPRAY_R*0.35)));
+    const dx=target.x-lastDab.x, dy=target.y-lastDab.y, dist=Math.hypot(dx,dy), stepN=Math.max(1,Math.floor(dist/(SPRAY_R*0.28)));
     for(let i=1;i<=stepN;i++){ dab(lastDab.x+dx*i/stepN, lastDab.y+dy*i/stepN); }
     lastDab.x=target.x; lastDab.y=target.y;
   }
@@ -557,6 +558,7 @@ function ensureDraw(){ if(!rafOn){ rafOn=true; requestAnimationFrame(render); } 
 function render(now){
   if(state==='spraying') stepSpray(now||performance.now());
   ctx.clearRect(0,0,W,H);
+  ctx.save(); roundRect(ctx,0,0,W,H,PAGE_R); ctx.clip();   // round the page corners -> no square edges on the paper
   // committed paint (no center ghost — reference is the pinned note only)
   ctx.drawImage(paintCv,0,0);
 
@@ -580,6 +582,7 @@ function render(now){
       ctx.fillStyle=sg; ctx.fillRect(0,0,W,H); ctx.restore(); }
     drawCurl(f);                                            // rolled-up band at the peel front
   }
+  ctx.restore();   // end page-corner clip
   // spray nozzle cursor
   const can=$('#sprayCan');
   if(nozzle.show){ const cw=playCv.clientWidth, ch=playCv.clientHeight;
