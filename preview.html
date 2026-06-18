@@ -518,6 +518,7 @@ function showStepRate(f){ const el=$('#stepRate'); if(!el)return; const tr=stepT
 function advance(){
   if(state!=='spraying')return;
   const db=$('#doneBtn'); if(db)db.style.display='none';
+  const pv=$('#prevBtn'); if(pv)pv.style.display='none';   // hide undo during the transition/result
   commitStep();
   showStepRate(stepAccuracy());                     // bouncy MISS/ALMOST/GOOD/EXCELLENT, letters L->R
   const last = stepIdx>=order.length-1;
@@ -912,8 +913,7 @@ function render(now){
     ctx.drawImage(sweepCv,0,0);   // full-opacity ink on the stencil too -> peeling it off is satisfying
     for(const p of spParts){ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,3+3*p.life,0,7); ctx.fill(); } ctx.globalAlpha=1;
   } else if(state==='peeling'){
-    // paintCv (committed colouring) + divider lines are drawn above; the beige stencil rolls UP from the bottom, revealing the drawing
-    if(linesCv) ctx.drawImage(linesCv,0,0);
+    // paintCv (committed colouring) is drawn above; the dark stencil rolls UP from the bottom, revealing the clean drawing (NO outline lines)
     const rollY=(1-peelOff)*H, curl=Math.min(82, H-rollY);   // roll travels from the bottom (H) up to the top (0)
     ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,Math.max(0,rollY-curl*0.35)); ctx.clip();   // stencil still lying flat above the roll
     ctx.drawImage(sheetCv,0,0); ctx.drawImage(sweepCv,0,0); ctx.restore();   // full-density ink rides off with the stencil
@@ -927,8 +927,7 @@ function render(now){
       ctx.restore();
     }
   } else if(state==='revealed'){
-    // brief beat between stencils: the drawing so far (paintCv, drawn above) + clean divider lines, no sheet
-    if(linesCv) ctx.drawImage(linesCv,0,0);
+    // brief beat between stencils: just the clean drawing so far (paintCv, drawn above) — no outline lines
   }
   ctx.restore();   // end page-corner clip
   // spray-can: appears once a colour is picked; follows the finger while spraying, otherwise rests BIG just below the canvas
@@ -1043,7 +1042,7 @@ function showResult(acc){
   state='judging';
   acc = (typeof acc==='number') ? acc : 100;
   const p=$('#popup');
-  const comp=cloneCv(paintCv); if(linesCv) comp.getContext('2d').drawImage(linesCv,0,0);   // finished picture with clean divider/border lines
+  const comp=cloneCv(paintCv);   // finished picture — clean colour only, no outline lines
   const pic=comp.toDataURL();
   const cleared = acc>=80;                                  // only ≥80% pictures are collected into the sketchbook
   if(cleared) saveToGallery(pic);
