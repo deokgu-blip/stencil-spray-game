@@ -400,11 +400,19 @@ function buildStepMasks(){
     for(let j=i+1;j<order.length;j++) g.drawImage(maskImgs[order[j].seq],0,0,W,H);   // subtract foreground layers drawn on top
     g.globalCompositeOperation='source-over'; stepMaskCv[i]=c; }
 }
-function buildStepSheet(){   // BLACK stencil whose ONLY hole is the CURRENT layer (maskCv)
-  sheetCtx.clearRect(0,0,W,H); sheetCtx.fillStyle='#23232b'; roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.fill();
+function buildStepSheet(){   // BEIGE card stencil with DEPTH; its ONLY hole is the CURRENT layer (maskCv)
+  sheetCtx.clearRect(0,0,W,H); sheetCtx.fillStyle='#d9cca6'; roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.fill();
   sheetCtx.save(); roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.clip();
-  sheetCtx.globalAlpha=0.05; for(let i=0;i<900;i++){ sheetCtx.fillStyle=(i&1)?'#000':'#4a4a57'; sheetCtx.fillRect(Math.random()*W,Math.random()*H,2,2);} sheetCtx.globalAlpha=1; sheetCtx.restore();
+  sheetCtx.globalAlpha=0.06; for(let i=0;i<900;i++){ sheetCtx.fillStyle=(i&1)?'#b8a980':'#efe8d2'; sheetCtx.fillRect(Math.random()*W,Math.random()*H,2,2);} sheetCtx.globalAlpha=1;
+  const sg=sheetCtx.createLinearGradient(0,0,0,H); sg.addColorStop(0,'rgba(255,251,238,.40)'); sg.addColorStop(.45,'rgba(255,255,255,0)'); sg.addColorStop(1,'rgba(74,62,38,.20)');
+  sheetCtx.fillStyle=sg; sheetCtx.fillRect(0,0,W,H); sheetCtx.restore();                                  // lit-from-top surface shading
   sheetCtx.globalCompositeOperation='destination-out'; sheetCtx.drawImage(maskCv,0,0); sheetCtx.globalCompositeOperation='source-over';   // punch the current layer's hole
+  // BEVEL: thick-card depth around each hole — dark rim hugging the cut, faint light lip just inside the card
+  const R=Math.max(3,Math.round(W*0.014));
+  const ring=morphCv(), rgc=ring.getContext('2d'); rgc.drawImage(dilateCv(maskCv,R),0,0);
+  rgc.globalCompositeOperation='destination-out'; rgc.drawImage(maskCv,0,0); rgc.globalCompositeOperation='source-over';   // ring on the card hugging the hole
+  const rimT=morphCv(), rt=rimT.getContext('2d'); rt.drawImage(ring,0,0); rt.globalCompositeOperation='source-in'; rt.fillStyle='#6f6246'; rt.fillRect(0,0,W,H);
+  sheetCtx.globalCompositeOperation='source-atop'; sheetCtx.globalAlpha=0.6; sheetCtx.drawImage(rimT,0,0); sheetCtx.globalAlpha=1; sheetCtx.globalCompositeOperation='source-over';
   sheetOutlineWhite(sheetCtx,0,0,W,H);
 }
 function prepStep(i){   // current disjoint region mask (clip + hole) + its black sheet
@@ -827,10 +835,19 @@ function render(now){
     ctx.globalAlpha=0.34; ctx.drawImage(sweepCv,0,0); ctx.globalAlpha=1;   // ink the player sprayed also marks the stencil
     for(const p of spParts){ ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,3+3*p.life,0,7); ctx.fill(); } ctx.globalAlpha=1;
   } else if(state==='peeling'){
-    // paintCv (the committed clean colouring) is already drawn above; overlay the clean divider lines, then slide the inky sheet off
+    // paintCv (committed colouring) + divider lines are drawn above; the beige stencil rolls UP from the bottom, revealing the drawing
     if(linesCv) ctx.drawImage(linesCv,0,0);
-    ctx.save(); ctx.globalAlpha=Math.max(0,1-peelOff); ctx.translate(-peelOff*W*1.15, -peelOff*H*0.5); ctx.rotate(-peelOff*0.12);
-    ctx.drawImage(sheetCv,0,0); ctx.globalAlpha=Math.max(0,1-peelOff)*0.34; ctx.drawImage(sweepCv,0,0); ctx.restore();   // ink rides off with the stencil
+    const rollY=(1-peelOff)*H, curl=Math.min(82, H-rollY);   // roll travels from the bottom (H) up to the top (0)
+    ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,Math.max(0,rollY-curl*0.35)); ctx.clip();   // stencil still lying flat above the roll
+    ctx.drawImage(sheetCv,0,0); ctx.globalAlpha=0.34; ctx.drawImage(sweepCv,0,0); ctx.globalAlpha=1; ctx.restore();
+    if(rollY>2 && peelOff<1){   // rolled beige paper cylinder at the leading edge
+      ctx.save(); ctx.translate(0, rollY-curl/2);
+      ctx.fillStyle='rgba(0,0,0,.16)'; roundRect(ctx,-12,curl/2-6,W+24,16,8); ctx.fill();   // soft shadow cast onto the revealed drawing below
+      const gr=ctx.createLinearGradient(0,-curl/2,0,curl/2); gr.addColorStop(0,'#c7bc9c'); gr.addColorStop(.5,'#ece3c8'); gr.addColorStop(1,'#b3a684');
+      ctx.fillStyle=gr; roundRect(ctx,-12,-curl/2,W+24,curl,curl/2); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,-curl/2+3); ctx.lineTo(W,-curl/2+3); ctx.stroke();   // crest highlight
+      ctx.restore();
+    }
   } else if(state==='revealed'){
     // brief beat between stencils: the drawing so far (paintCv, drawn above) + clean divider lines, no sheet
     if(linesCv) ctx.drawImage(linesCv,0,0);
