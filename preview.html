@@ -444,13 +444,12 @@ function buildStepMasks(){
     for(let j=i+1;j<order.length;j++) g.drawImage(maskImgs[order[j].seq],0,0,W,H);   // subtract foreground layers drawn on top
     g.globalCompositeOperation='source-over'; stepMaskCv[i]=c; }
 }
-function buildStepSheet(){   // BEIGE strongly-textured CARD stencil; ONLY hole = current layer (maskCv). NO inner/outer lines.
-  sheetCtx.clearRect(0,0,W,H); sheetCtx.fillStyle='#cdbd92'; roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.fill();
+function buildStepSheet(){   // DARK warm textured CARD stencil; ONLY hole = current layer (maskCv). White holes pop -> clear where to colour.
+  sheetCtx.clearRect(0,0,W,H); sheetCtx.fillStyle='#46402f'; roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.fill();
   sheetCtx.save(); roundRect(sheetCtx,0,0,W,H,PAGE_R); sheetCtx.clip();
-  if(paperTexImg){ sheetCtx.globalCompositeOperation='multiply'; sheetCtx.drawImage(paperTexImg,0,0,W,H);
-    sheetCtx.globalCompositeOperation='overlay'; sheetCtx.globalAlpha=0.55; sheetCtx.drawImage(paperTexImg,0,0,W,H); sheetCtx.globalAlpha=1; sheetCtx.globalCompositeOperation='source-over'; }   // STRONG paper grain (multiply + overlay)
-  sheetCtx.globalAlpha=0.20; for(let i=0;i<2600;i++){ const v=i%3; sheetCtx.fillStyle=v===0?'#827448':v===1?'#b3a37a':'#f4eeda'; const s=1+(i%3); sheetCtx.fillRect(Math.random()*W,Math.random()*H,s,s);} sheetCtx.globalAlpha=1;   // dense fibrous grain -> clearly reads as paper
-  const sg=sheetCtx.createLinearGradient(0,0,0,H); sg.addColorStop(0,'rgba(255,251,238,.34)'); sg.addColorStop(.45,'rgba(255,255,255,0)'); sg.addColorStop(1,'rgba(74,62,38,.24)');
+  if(paperTexImg){ sheetCtx.globalCompositeOperation='overlay'; sheetCtx.globalAlpha=0.55; sheetCtx.drawImage(paperTexImg,0,0,W,H); sheetCtx.globalAlpha=1; sheetCtx.globalCompositeOperation='source-over'; }   // grain on the dark card
+  sheetCtx.globalAlpha=0.17; for(let i=0;i<2600;i++){ const v=i%3; sheetCtx.fillStyle=v===0?'#2b2519':v===1?'#6b5e44':'#9a8b63'; const s=1+(i%3); sheetCtx.fillRect(Math.random()*W,Math.random()*H,s,s);} sheetCtx.globalAlpha=1;   // light+dark fibres show clearly on the dark card
+  const sg=sheetCtx.createLinearGradient(0,0,0,H); sg.addColorStop(0,'rgba(255,246,224,.14)'); sg.addColorStop(.45,'rgba(255,255,255,0)'); sg.addColorStop(1,'rgba(0,0,0,.28)');
   sheetCtx.fillStyle=sg; sheetCtx.fillRect(0,0,W,H); sheetCtx.restore();
   sheetCtx.globalCompositeOperation='destination-out'; sheetCtx.drawImage(maskCv,0,0); sheetCtx.globalCompositeOperation='source-over';   // punch the hole — clean cut, no rim/line
 }
@@ -543,8 +542,7 @@ function unrollStencil(){ return new Promise(res=>{ const dur=760, t0=performanc
   (function st(){ const k=Math.min(1,(performance.now()-t0)/dur), e=1-(1-k)*(1-k); window.__uK=k;
     ctx.clearRect(0,0,W,H); ctx.save(); roundRect(ctx,0,0,W,H,PAGE_R); ctx.clip();
     ctx.fillStyle='#fcfaf4'; ctx.fillRect(0,0,W,H);            // solid white paper under the unrolling stencil
-    ctx.drawImage(paintCv,0,0);
-    if(linesCv) ctx.drawImage(linesCv,0,0);                    // show divider lines on the drawing so far
+    ctx.drawImage(paintCv,0,0);                                 // (committed colour only; NO outline sketch shown before the stencil lays)
     const revY=e*H, curl=Math.min(70,revY);
     ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,revY); ctx.clip(); ctx.drawImage(sheetCv,0,0); ctx.restore();   // unrolled portion
     if(revY>3 && k<1){   // rolling paper cylinder at the leading edge
