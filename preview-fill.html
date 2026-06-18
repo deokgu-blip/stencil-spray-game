@@ -1,0 +1,117 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>슥슥 칠하기 — 스텐실 채우기</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(120% 90% at 50% 14%,#eaf3ef 0%,#cfe0da 55%,#b9d2ca 100%);touch-action:none;}
+  #wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;}
+  #title{margin-top:14px;color:#5b7b86;font-weight:800;font-size:18px;}
+  #hint{color:#7d97a0;font-size:13px;margin-top:3px;font-weight:600;height:18px;}
+  #barWrap{width:300px;height:16px;background:#d7e6e0;border-radius:12px;margin-top:10px;overflow:hidden;box-shadow:inset 0 2px 3px rgba(0,0,0,.08);}
+  #bar{height:100%;width:0;border-radius:12px;background:linear-gradient(180deg,#8fe6bf,#43c08e);transition:width .1s;}
+  #boardWrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;}
+  #board{width:344px;height:344px;border-radius:30px;background:#fff;box-shadow:0 18px 36px rgba(60,80,80,.28);touch-action:none;}
+  #pal{display:flex;gap:14px;margin-bottom:8px;}
+  .sw{width:58px;height:58px;border-radius:50%;cursor:pointer;border:4px solid rgba(255,255,255,.7);box-shadow:0 4px 8px rgba(0,0,0,.18);transition:transform .12s;}
+  .sw.sel{transform:scale(1.16);border-color:#3a6b5e;}
+  .sw.want{animation:swbob 1.1s ease-in-out infinite;}
+  @keyframes swbob{0%,100%{transform:scale(1.04);}50%{transform:scale(1.18);}}
+  #foot{margin-bottom:22px;color:#7d97a0;font-size:13px;font-weight:700;height:18px;}
+  #win{position:fixed;inset:0;background:rgba(20,30,30,.55);display:none;align-items:center;justify-content:center;z-index:30;}
+  #win.show{display:flex;}
+  #card{background:linear-gradient(180deg,#fffef9,#fff5e9);border-radius:34px;padding:26px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,.4);}
+  #card img{width:240px;height:240px;border-radius:22px;box-shadow:inset 0 0 0 4px rgba(0,0,0,.06);}
+  #card h2{color:#2f9e7e;font-size:26px;margin:12px 0 4px;}
+  #card p{color:#8a988f;font-weight:700;margin-bottom:14px;}
+  .btn{padding:12px 30px;border:none;border-radius:24px;font-size:17px;font-weight:800;color:#fff;background:linear-gradient(180deg,#56c294,#2f9e7e);box-shadow:0 6px 0 #237a61;cursor:pointer;}
+  .btn:active{transform:translateY(3px);box-shadow:0 3px 0 #237a61;}
+</style></head>
+<body>
+<div id="wrap">
+  <div id="title">슥슥 칠하기</div>
+  <div id="hint">색을 고르고, 구멍을 손가락으로 칠하세요 ✋</div>
+  <div id="barWrap"><div id="bar"></div></div>
+  <div id="boardWrap"><canvas id="board" width="600" height="600"></canvas></div>
+  <div id="pal"></div>
+  <div id="foot"></div>
+</div>
+<div id="win"><div id="card"><img id="winImg"><h2>완성!</h2><p>스케치북에 저장됐어요 ✓</p><button class="btn" id="again">다시</button></div></div>
+<script>
+const $=s=>document.querySelector(s);
+const S=600, R=40;
+// scene = stencils painted back -> front. each: target colour + the hole shape.
+const STENCILS=[
+  {col:'#8fd0e6', name:'하늘', hole:c=>{ rr(c,46,46,508,300,30); }},                                   // sky
+  {col:'#86c46a', name:'언덕', hole:c=>{ c.beginPath(); c.ellipse(300,640,300,210,0,0,7); }},            // hill
+  {col:'#7bb36a', name:'언덕2',hole:c=>{ c.beginPath(); c.ellipse(150,660,170,150,0,0,7); }},            // hill bump
+  {col:'#ffd23f', name:'해',   hole:c=>{ c.beginPath(); c.arc(440,160,68,0,7); }},                       // sun
+  {col:'#5b8f4e', name:'나무', hole:c=>{ c.beginPath(); c.ellipse(180,360,52,80,0,0,7); }},              // tree
+];
+const PALETTE=['#8fd0e6','#86c46a','#ffd23f','#5b8f4e','#e08a8a'];   // includes an unused decoy colour
+const board=$('#board'), bx=board.getContext('2d');
+const paint=document.createElement('canvas'); paint.width=S;paint.height=S; const pc=paint.getContext('2d');   // committed picture
+const holeM=document.createElement('canvas'); holeM.width=S;holeM.height=S; const hm=holeM.getContext('2d');   // current hole mask
+const fill=document.createElement('canvas'); fill.width=S;fill.height=S; const fc=fill.getContext('2d');       // sprayed colour in hole
+let idx=0, sel=null, pressing=false, fx=0,fy=0, parts=[], holeArea=1, peeling=0, done=false, raf=0;
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+function buildHole(){ const s=STENCILS[idx]; hm.clearRect(0,0,S,S); hm.fillStyle='#fff'; s.hole(hm); hm.fill();
+  // hole area (lowres)
+  const n=90,t=document.createElement('canvas');t.width=n;t.height=n;const g=t.getContext('2d');g.drawImage(holeM,0,0,n,n);
+  const d=g.getImageData(0,0,n,n).data; let a=0; for(let i=3;i<d.length;i+=4)if(d[i]>40)a++; holeArea=Math.max(1,a);
+  fc.clearRect(0,0,S,S); peeling=0;
+}
+function buildPal(){ const p=$('#pal'); p.innerHTML=''; const want=STENCILS[idx].col;
+  PALETTE.forEach(col=>{ const el=document.createElement('div'); el.className='sw'+(col===sel?' sel':'')+(col===want&&col!==sel?' want':'');
+    el.style.background=col; el.onclick=()=>{ sel=col; if(col!==want){ fc.clearRect(0,0,S,S); } buildPal(); }; p.appendChild(el); }); }
+function sheet(c){ // white cover with the current hole cut out
+  c.save(); rr(c,0,0,S,S,40); c.clip();
+  c.fillStyle='#f3eee3'; c.fillRect(0,0,S,S);
+  c.globalAlpha=0.05; for(let i=0;i<700;i++){c.fillStyle=(i&1)?'#000':'#b7ad98';c.fillRect(Math.random()*S,Math.random()*S,2,2);}c.globalAlpha=1;
+  c.globalCompositeOperation='destination-out'; const s=STENCILS[idx]; s.hole(c); c.fill(); c.globalCompositeOperation='source-over';
+  // dark rim around the hole so it reads as a cut-out
+  c.save(); const s2=STENCILS[idx]; s2.hole(c); c.clip(); c.lineWidth=10; c.strokeStyle='rgba(40,36,32,.5)'; s2.hole(c); c.stroke(); c.restore();
+  c.restore();
+}
+function spray(x,y){ if(sel!==STENCILS[idx].col) { sel=STENCILS[idx].col; buildPal(); }   // auto-pick the right colour on first stroke
+  fc.fillStyle=sel; const g=fc.createRadialGradient(x,y,1,x,y,R); g.addColorStop(0,sel); g.addColorStop(.7,sel); g.addColorStop(1,sel+'00');
+  fc.fillStyle=g; fc.beginPath(); fc.arc(x,y,R,0,7); fc.fill();
+  fc.save(); fc.globalCompositeOperation='destination-in'; fc.drawImage(holeM,0,0); fc.restore();   // keep only inside the hole
+  for(let i=0;i<5;i++){const a=Math.random()*7,sp=1+Math.random()*4;parts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:1,c:sel});}
+}
+function coverage(){ const n=90,t=document.createElement('canvas');t.width=n;t.height=n;const g=t.getContext('2d');g.drawImage(fill,0,0,n,n);
+  const d=g.getImageData(0,0,n,n).data; let f=0; for(let i=3;i<d.length;i+=4)if(d[i]>60)f++; return f/holeArea; }
+function render(){
+  bx.clearRect(0,0,S,S); bx.save(); rr(bx,0,0,S,S,40); bx.clip();
+  bx.fillStyle='#fdf8ec'; bx.fillRect(0,0,S,S);
+  bx.drawImage(paint,0,0);                 // picture so far
+  if(!done){ bx.drawImage(fill,0,0); }     // colour being sprayed into the hole
+  bx.restore();
+  if(!done && peeling===0){ sheet(bx); }   // the stencil cover (hole shows the fill)
+  else if(peeling>0){ // peel the sheet off (slide up-left)
+    bx.save(); rr(bx,0,0,S,S,40); bx.clip(); bx.translate(-peeling*S*1.2, -peeling*S*0.5); sheet(bx); bx.restore();
+  }
+  for(const p of parts){ bx.globalAlpha=Math.max(0,p.life); bx.fillStyle=p.c; bx.beginPath(); bx.arc(p.x,p.y,3+3*p.life,0,7); bx.fill(); }
+  bx.globalAlpha=1;
+  if(pressing && !done && peeling===0){ bx.fillStyle='rgba(255,255,255,.45)'; bx.beginPath(); bx.arc(fx,fy,R*.55,0,7); bx.fill(); }
+  parts=parts.filter(p=>p.life>0); for(const p of parts){p.x+=p.vx;p.y+=p.vy;p.vy+=.25;p.life-=.05;}
+  if(!done && peeling===0){ const cov=Math.min(1,coverage()); $('#bar').style.width=(Math.min(1,cov/0.9)*100)+'%'; if(cov>=0.9 && sel===STENCILS[idx].col) startPeel(); }
+  if(peeling>0 && peeling<1){ peeling=Math.min(1,peeling+0.05); if(peeling>=1) nextStencil(); }
+  raf=requestAnimationFrame(render);
+}
+function startPeel(){ // commit the colour cleanly, then peel
+  pc.save(); STENCILS[idx].hole(pc); pc.clip(); pc.fillStyle=STENCILS[idx].col; pc.fillRect(0,0,S,S); pc.restore();
+  fc.clearRect(0,0,S,S); peeling=0.001; $('#hint').textContent='쫙— 벗겨진다!';
+}
+function nextStencil(){ peeling=0; idx++;
+  if(idx>=STENCILS.length){ done=true; $('#bar').style.width='100%'; setTimeout(()=>{ $('#winImg').src=board.toDataURL(); $('#win').classList.add('show'); },350); return; }
+  sel=null; buildHole(); buildPal(); $('#hint').textContent='색을 고르고, 구멍을 칠하세요'; $('#bar').style.width='0';
+}
+function pos(e){ const r=board.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*S, y:(e.clientY-r.top)/r.height*S}; }
+board.addEventListener('pointerdown',e=>{ if(done||peeling>0)return; pressing=true; const p=pos(e); fx=p.x;fy=p.y; spray(fx,fy); });
+board.addEventListener('pointermove',e=>{ if(!pressing||done||peeling>0)return; const p=pos(e); const st=Math.max(1,Math.hypot(p.x-fx,p.y-fy)/(R*.4)); for(let i=1;i<=st;i++)spray(fx+(p.x-fx)*i/st,fy+(p.y-fy)*i/st); fx=p.x;fy=p.y; });
+window.addEventListener('pointerup',()=>pressing=false);
+$('#again').onclick=()=>{ $('#win').classList.remove('show'); idx=0; done=false; sel=null; pc.clearRect(0,0,S,S); buildHole(); buildPal(); $('#bar').style.width='0'; $('#hint').textContent='색을 고르고, 구멍을 칠하세요'; };
+buildHole(); buildPal(); render();
+window.__qa={ fillNow:()=>{ const s=STENCILS[idx]; sel=s.col; fc.save(); fc.globalCompositeOperation='source-over'; fc.fillStyle=s.col; s.hole(fc); fc.fill(); fc.globalCompositeOperation='destination-in'; fc.drawImage(holeM,0,0); fc.restore(); }, idx:()=>idx, done:()=>done };
+</script>
+</body></html>
