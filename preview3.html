@@ -225,20 +225,24 @@ function computeTiles(){
   // pass 2: build each stencil's tile at the SHARED size (holes at their position within the shared box)
   for(const s of stencils){
     s.home={x:home.x,y:home.y}; s.box={w:bw,h:bh};
-    // WHITE paper stencil sheet with REAL punched-through holes (transparent -> background shows through)
-    const mk=(g)=>{
+    // WHITE paper stencil sheet; each hole shows a TRANSLUCENT preview of the actual paint colour
+    const tintCv=document.createElement('canvas'); tintCv.width=bw; tintCv.height=bh; const txc=tintCv.getContext('2d');
+    txc.fillStyle=s.color||'#888'; txc.fillRect(0,0,bw,bh);
+    txc.globalCompositeOperation='destination-in'; txc.drawImage(maskImgs[s.seq], -home.x, -home.y, W, H);  // solid colour, clipped to the holes
+    const mk=(g,tintA)=>{
       g.clearRect(0,0,bw,bh);
       g.fillStyle='#f6f2e8'; roundRect(g,0,0,bw,bh,22); g.fill();           // warm paper-white sheet
       g.save(); roundRect(g,0,0,bw,bh,22); g.clip();
       g.globalAlpha=0.045; for(let i=0;i<240;i++){ g.fillStyle=(i&1)?'#000':'#a89e88'; g.fillRect(Math.random()*bw,Math.random()*bh,2,2);} g.globalAlpha=1;  // faint paper grain
       g.restore();
       g.globalCompositeOperation='destination-out'; g.drawImage(maskImgs[s.seq], -home.x, -home.y, W, H); g.globalCompositeOperation='source-over';  // punch real holes
+      g.globalAlpha=tintA; g.drawImage(tintCv,0,0); g.globalAlpha=1;   // translucent colour preview in the holes
       g.drawImage(holeRim(s.seq,home,bw,bh),0,0);   // dark inner rim -> holes clearly read as cut-outs
       sheetOutlineWhite(g,0,0,bw,bh);
     };
-    const cv=document.createElement('canvas'); cv.width=bw; cv.height=bh; mk(cv.getContext('2d'));
+    const cv=document.createElement('canvas'); cv.width=bw; cv.height=bh; mk(cv.getContext('2d'),0.6);   // queue tile
     s.tile=cv; s.tileURL=cv.toDataURL();
-    const dcv=document.createElement('canvas'); dcv.width=bw; dcv.height=bh; mk(dcv.getContext('2d'));
+    const dcv=document.createElement('canvas'); dcv.width=bw; dcv.height=bh; mk(dcv.getContext('2d'),0.85);   // drag/field sheet (rendered translucent, so a stronger tint)
     s.dragSheet=dcv;
   }
 }
