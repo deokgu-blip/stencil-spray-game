@@ -225,7 +225,17 @@ let sprayBox={x0:0,y0:0,x1:W,y1:H}, sprayRows=10;  // spray sweep region (around
 
 // ---------- audio ----------
 const A={};
-function initAudio(){ for(const k of ['spray','chak','peel','win','fail']){ if(assets[k]){A[k]=new Audio(assets[k]);A[k].preload='auto';} } if(A.spray)A.spray.loop=true; if(A.peel)A.peel.loop=true; }
+let actx=null, sprayBuf=null, sprayNode=null, sprayGain=null;   // Web Audio = perfectly GAPLESS spray loop (<audio loop> gaps between cycles)
+const SPRAY_VOL=0.26;
+function initAudio(){ for(const k of ['spray','chak','peel','win','fail']){ if(assets[k]){A[k]=new Audio(assets[k]);A[k].preload='auto';} } if(A.peel)A.peel.loop=true;
+  try{ actx=new (window.AudioContext||window.webkitAudioContext)(); if(assets.spray){ fetch(assets.spray).then(r=>r.arrayBuffer()).then(ab=>actx.decodeAudioData(ab)).then(buf=>{sprayBuf=buf;}).catch(()=>{}); } }catch(e){} }
+function sprayLoopOn(){
+  if(actx&&sprayBuf){ sprayLoopOff(); try{ if(actx.state==='suspended')actx.resume();
+    sprayNode=actx.createBufferSource(); sprayNode.buffer=sprayBuf; sprayNode.loop=true;   // gapless, zero inter-loop gap
+    sprayGain=actx.createGain(); sprayGain.gain.value=SPRAY_VOL; sprayNode.connect(sprayGain).connect(actx.destination); sprayNode.start(); return; }catch(e){} }
+  if(A.spray){ A.spray.loop=true; A.spray.volume=SPRAY_VOL; try{A.spray.currentTime=0;A.spray.play().catch(()=>{});}catch(e){} }   // fallback
+}
+function sprayLoopOff(){ if(sprayNode){ try{sprayNode.stop();}catch(e){} sprayNode=null; } if(A.spray){ try{A.spray.pause();}catch(e){} } }
 // mobile browsers block audio until a user gesture — unlock all clips on the first touch
 let audioUnlocked=false;
 // prime ONLY a short one-shot (NOT the looping spray/peel — priming those leaked spray sound during drag)
@@ -396,14 +406,14 @@ function updateHint(){ const h=$('#canHint'); if(!h)return;
 function buildCarousel(){ buildBottom(); }   // alias (legacy callers)
 function fillDab(x,y){ const r=brushR(); sweepCtx.globalAlpha=1; sweepCtx.fillStyle=selColor; sweepCtx.beginPath(); sweepCtx.arc(x,y,r,0,7); sweepCtx.fill();
   for(let i=0;i<4;i++){ const a=Math.random()*7, sp=1+Math.random()*4; spParts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:1,c:selColor}); } }
-function fillSpray(x,y){ if(!selColor||state!=='spraying')return; if(!nozzle.show){nozzle.show=true; loopOn(A.spray,0.5); setHint('');} fillDab(x,y); lastFill={x,y}; nozzle.x=x;nozzle.y=y; ensureDraw(); }
+function fillSpray(x,y){ if(!selColor||state!=='spraying')return; if(!nozzle.show){nozzle.show=true; sprayLoopOn(); setHint('');} fillDab(x,y); lastFill={x,y}; nozzle.x=x;nozzle.y=y; ensureDraw(); }
 function fillStroke(x,y){ if(!selColor||state!=='spraying')return; if(lastFill){ const dx=x-lastFill.x,dy=y-lastFill.y,d=Math.hypot(dx,dy),n=Math.max(1,Math.floor(d/(brushR()*0.4))); for(let i=1;i<=n;i++)fillDab(lastFill.x+dx*i/n,lastFill.y+dy*i/n); } else fillDab(x,y); lastFill={x,y}; nozzle.x=x;nozzle.y=y; }
 function fillCover(){ const n=90,t=document.createElement('canvas');t.width=n;t.height=n;const g=t.getContext('2d'); g.drawImage(sweepCv,0,0,n,n); g.globalCompositeOperation='destination-in'; g.drawImage(maskCv,0,0,n,n);
   const d=g.getImageData(0,0,n,n).data; let f=0; for(let i=3;i<d.length;i+=4)if(d[i]>40)f++; return f/maskArea90; }
 function playPos(e){ const r=playCv.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*W, y:(e.clientY-r.top)/r.height*H}; }
 playCv.addEventListener('pointerdown',e=>{ if(state!=='spraying')return; e.preventDefault(); fingerDown=true; try{playCv.setPointerCapture(e.pointerId);}catch(_){}; const p=playPos(e); fillSpray(p.x,p.y); });
 playCv.addEventListener('pointermove',e=>{ if(!fingerDown||state!=='spraying')return; const p=playPos(e); fillStroke(p.x,p.y); });
-window.addEventListener('pointerup',()=>{ fingerDown=false; lastFill=null; if(nozzle.show){nozzle.show=false; loopOff(A.spray);} });
+window.addEventListener('pointerup',()=>{ fingerDown=false; lastFill=null; if(nozzle.show){nozzle.show=false; sprayLoopOff();} });
 function layNext(){ const s=nextStencil(); if(!s){ state='review'; runReview(); return; } placeStencil(s,{x:0,y:0}); }
 // ---------- SINGLE-stencil spray-colouring: one sheet = whole picture; colour freely; COMPLETE -> peel + accuracy ----------
 // square morphological ops via offset draws (cheap; run once at stage start)
@@ -497,7 +507,7 @@ async function layStep(i){
   state='spraying'; setStepButton(); selectCan(carIdx); updateHint(); ensureDraw();
 }
 function commitStep(){
-  fingerDown=false; if(nozzle.show){ nozzle.show=false; loopOff(A.spray); }
+  fingerDown=false; if(nozzle.show){ nozzle.show=false; sprayLoopOff(); }
   sweepCtx.globalCompositeOperation='destination-in'; sweepCtx.drawImage(maskCv,0,0); sweepCtx.globalCompositeOperation='source-over';   // keep colour only inside the current region
   paintCtx.drawImage(sweepCv,0,0);                  // commit it into the accumulating picture
   order[stepIdx].used=true;
@@ -576,7 +586,7 @@ function unrollStencil(){ return new Promise(res=>{ const dur=760, t0=performanc
 function onComplete(){
   if(state!=='spraying')return;
   const db=$('#doneBtn'); if(db)db.style.display='none';
-  fingerDown=false; if(nozzle.show){ nozzle.show=false; loopOff(A.spray); }
+  fingerDown=false; if(nozzle.show){ nozzle.show=false; sprayLoopOff(); }
   sweepCtx.globalCompositeOperation='destination-in'; sweepCtx.drawImage(maskCv,0,0); sweepCtx.globalCompositeOperation='source-over';   // clip the colouring inside the lines
   paintCtx.drawImage(sweepCv,0,0);   // commit the clean colouring
   state='peeling'; peelOff=0; loopOn(A.peel,0.6); const t0=performance.now();
@@ -775,7 +785,7 @@ function stepSpray(now){   // single-stencil colouring: finger paints the sweep;
   spParts=spParts.filter(p=>p.life>0); for(const p of spParts){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.25; p.life-=0.05; }
 }
 function finishSpray(){
-  loopOff(A.spray); nozzle.show=false; fingerDown=false; $('#sprayCan').style.display='none';
+  sprayLoopOff(); nozzle.show=false; fingerDown=false; $('#sprayCan').style.display='none';
   buildHoleInk();   // clean in-hole colour (revealed on peel)
   // STRAY: ink the player sprayed OUTSIDE the holes stays on the sketchbook (rewards careful spraying)
   const stray=cloneCv(sweepCv); const sg2=stray.getContext('2d'); sg2.globalCompositeOperation='destination-out'; sg2.drawImage(maskCv,0,0); sg2.globalCompositeOperation='source-over';
@@ -808,7 +818,7 @@ function finishPeel(){   // sheet fully peeled: commit the clean fill, then auto
 function finalizeActive(){
   if(!active)return;
   placeGen++;                              // invalidate any pending spray/peel callbacks
-  loopOff(A.spray); loopOff(A.peel); nozzle.show=false; const can=$('#sprayCan'); if(can)can.style.display='none';
+  sprayLoopOff(); loopOff(A.peel); nozzle.show=false; const can=$('#sprayCan'); if(can)can.style.display='none';
   buildHoleInk();                          // make sure the solid ink is ready, then commit (no rating popup mid-action)
   commitActive(false);
   sweepCtx.clearRect(0,0,W,H); sheetCtx.clearRect(0,0,W,H); holeInkCtx.clearRect(0,0,W,H); peel=0;
