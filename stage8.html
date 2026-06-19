@@ -1213,7 +1213,7 @@ function showResult(acc){
     btns += `<button class="btn primary" id="rt">RETRY</button>`;
     btns += galBtn;
   }
-  const endNote = (cleared && isLast) ? `<div class="endnote">Thanks for playing them all!<br>New stages are coming soon.</div>` : '';
+  const endNote = (cleared && isLast) ? `<div class="endnote">Thanks for playing them all! 💛<br>New stages are coming soon.</div>` : '';
   sfx(cleared?'win':'fail'); if(navigator.vibrate)navigator.vibrate([20,40,20,40,40]); p.className='panel'+(assets.sketchPopup?' sketch':''); if(cleared)launchConfetti(acc>=95);   // celebrate only when cleared (>=80%)
   p.innerHTML=`${draw}<div class="praise">${praise}</div><p class="score">ACCURACY ${acc}%</p><div class="btns">${btns}</div>${endNote}`;
   $('#overlay').classList.add('show');
