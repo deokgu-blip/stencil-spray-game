@@ -464,7 +464,9 @@ function attachCarousel(vp,track){
     if(tutorial&&window.__tut)window.__tut.onQueuePick(); };   // operating the queue (tap OR drag) ends the queue tutorial
   vp.onpointermove=e=>{ if(!down)return; const dx=(e.clientX-sx)/(scaleS||1); moved=Math.max(moved,Math.abs(dx)); carDragShift=dx; layoutCans(); };
   const end=e=>{ if(!down)return; down=false; track.style.transition='transform .22s cubic-bezier(.3,.85,.3,1)';
-    if(moved<10){ const el=(e.target&&e.target.closest)?e.target.closest('.can'):null; if(el){ selectCan(+el.dataset.i); if(tutorial&&window.__tut)window.__tut.onQueuePick(); } else {carDragShift=0;layoutCans();} }
+    try{vp.releasePointerCapture(e.pointerId);}catch(_){}
+    if(moved<10){ const hit=document.elementFromPoint(e.clientX,e.clientY); const el=hit&&hit.closest?hit.closest('.can'):null;   // pointer-capture makes e.target the container -> hit-test by position instead
+      if(el){ selectCan(+el.dataset.i); if(tutorial&&window.__tut)window.__tut.onQueuePick(); } else {carDragShift=0;layoutCans();} }
     else selectCan(carIdx + Math.round(-carDragShift/CAN_SLOT)); };
   vp.onpointerup=end; vp.onpointercancel=end;
 }
