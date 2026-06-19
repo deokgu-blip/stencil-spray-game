@@ -72,7 +72,7 @@
   #cans{position:relative;flex:1 1 auto;height:198px;overflow:hidden;cursor:grab;border-radius:30px;background:#bca476;box-shadow:0 8px 16px rgba(40,55,55,.26),inset 0 0 0 3px rgba(90,72,42,.28),inset 0 5px 12px rgba(0,0,0,.16);}
   #cans:active{cursor:grabbing;}
   #canTrack{position:absolute;left:50%;top:0;height:192px;display:flex;align-items:center;will-change:transform;}
-  .can{flex:0 0 158px;height:188px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transform:scale(.74);transition:transform .2s cubic-bezier(.3,.85,.3,1),opacity .2s;}
+  .can{flex:0 0 158px;height:188px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.86;transform:scale(.74);transition:transform .2s cubic-bezier(.3,.85,.3,1),opacity .2s;}
   .cimg{width:150px;height:150px;object-fit:contain;filter:drop-shadow(0 8px 9px rgba(40,55,55,.36));pointer-events:none;}
   .can.sel{opacity:1;transform:scale(1.18);}
   .can.sel .cimg{filter:drop-shadow(0 13px 15px rgba(40,55,55,.46));}
@@ -453,8 +453,7 @@ function buildCans(){
 }
 function layoutCans(){ const track=$('#canTrack'); if(!track)return;
   [...track.children].forEach((el,i)=>el.classList.toggle('sel',i===carIdx));
-  const n=STAGE_COLORS.length, vp=$('#cans'), vw=(vp&&vp.clientWidth)?vp.clientWidth:880, total=n*CAN_SLOT;
-  const shift = (total<=vw) ? -total/2 : (-carIdx*CAN_SLOT - CAN_SLOT/2);   // fits -> centre whole group; overflow -> centre selection
+  const shift = -(carIdx*CAN_SLOT + CAN_SLOT/2);   // ALWAYS centre the SELECTED paint (tapped paint slides to the queue centre)
   track.style.transform='translateX('+(shift+carDragShift)+'px)'; }
 function selectCan(i){ carIdx=Math.max(0,Math.min(STAGE_COLORS.length-1,i)); selColor=STAGE_COLORS[carIdx]; carDragShift=0; layoutCans(); updateWcirc(); updateHint();
   const can=$('#sprayCan'); if(can&&selColor) can.src=tintedCan(selColor);   // the picked spray-can appears, tinted to the colour
