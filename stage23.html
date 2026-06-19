@@ -318,7 +318,7 @@ async function goStage(idx){
   peel=0; peelOff=0; sprayT=0; selColor=null; carIdx=0; carDragShift=0; paintedThisStep=false; tutPhase=-1;
   spParts=[]; lastFill=null; fingerDown=false; nozzle.show=false; sprayLoopOff();
   paintCtx.clearRect(0,0,W,H); sweepCtx.clearRect(0,0,W,H);
-  $('#overlay').classList.remove('show'); $('#tut').classList.remove('show'); $('#stepRate').classList.remove('show');
+  $('#overlay').classList.remove('show'); $('#tut').classList.remove('show'); $('#stepRate').classList.remove('show'); tutClearGate();
   const db=$('#doneBtn'); if(db){ db.style.display='none'; db.classList.remove('ready'); }
   const pv=$('#prevBtn'); if(pv)pv.style.display='none';
   await loadStage();
@@ -591,15 +591,20 @@ function waitForMemoCheck(){ return new Promise(res=>{ const rb=$('#refBox'); if
   rb.addEventListener('pointerdown',dn); window.addEventListener('pointerup',up);
   const to=setTimeout(()=>{ if(done)return; done=true; cleanup(); res(); }, 14000);   // safety fallback so it never hangs
 }); }
+// TUTORIAL gate: during the tutorial only the CURRENT target is clickable; every other control is blocked
+const TUT_CTRLS=['#bookBtn','#prevBtn','#doneBtn','#cans','#refBox','#dev'];
+function tutSetGate(allowSel){ TUT_CTRLS.forEach(sel=>{ const el=$(sel); if(!el)return; el.style.pointerEvents=(allowSel&&el.matches(allowSel))?'auto':'none'; }); }
+function tutClearGate(){ TUT_CTRLS.forEach(sel=>{ const el=$(sel); if(el)el.style.pointerEvents=''; }); }
 function tutStart(){ if(!tutorial)return; tutPhase=0; tutShow($('#refBox').getBoundingClientRect(),'Tap the picture\nto check it! 🖼️',1.7);
   const rb=$('#refBox'); if(rb){ const h=()=>{ if(tutPhase!==0)return; rb.removeEventListener('click',h); tutSpray(); }; rb.addEventListener('click',h); }   // advance only when the player taps the goal picture
   setTimeout(()=>{ if(tutPhase===0)tutSpray(); }, 14000); }   // safety fallback so it never hangs
 function tutSpray(){ if(!tutorial||tutPhase!==0)return; tutPhase=1; const ci=STAGE_COLORS.indexOf(active&&active.color); selectCan(ci>=0?ci:0);
+  tutSetGate(null);   // spray on the canvas only — all buttons blocked (incl. premature 'done')
   tutShow(playCv.getBoundingClientRect(),'Hold & spray to fill\nthe white shape!',0.62); }
-function tutCheck(){ if(!tutorial||tutPhase!==1)return; if(regionCoverage()>=0.6){ tutPhase=2; markReady(); tutShow($('#doneBtn').getBoundingClientRect(),'Nicely done!\nTap to continue →',2.0); } }
-function tutOnAdvance(){ if(tutorial&&tutPhase===2){ tutPhase=3; tutHide(); } }
-function tutOnLaid(){ if(tutorial&&tutPhase===3){ tutPhase=4; tutShow($('#cans').getBoundingClientRect(),'Now pick a color,\nthen spray! 🎨',1.04); } }
-function tutOnQueuePick(){ if(tutorial&&tutPhase===4){ tutPhase=5; tutHide(); tutorial=false; } }   // queue operated -> tutorial ends
+function tutCheck(){ if(!tutorial||tutPhase!==1)return; if(regionCoverage()>=0.6){ tutPhase=2; markReady(); tutSetGate('#doneBtn'); tutShow($('#doneBtn').getBoundingClientRect(),'Nicely done!\nTap to continue →',2.0); } }
+function tutOnAdvance(){ if(tutorial&&tutPhase===2){ tutPhase=3; tutSetGate(null); tutHide(); } }
+function tutOnLaid(){ if(tutorial&&tutPhase===3){ tutPhase=4; tutSetGate('#cans'); tutShow($('#cans').getBoundingClientRect(),'Now pick a color,\nthen spray! 🎨',1.04); } }
+function tutOnQueuePick(){ if(tutorial&&tutPhase===4){ tutPhase=5; tutHide(); tutorial=false; tutClearGate(); } }   // queue operated -> tutorial ends, all controls re-enabled
 window.__tut={ onPaintRelease:tutCheck, onLaid:tutOnLaid, onAdvance:tutOnAdvance, onQueuePick:tutOnQueuePick };
 function showHardBanner(){ return new Promise(res=>{ const b=$('#hardBanner'); if(!b){res();return;} sfx('chak'); b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); setTimeout(res,1500); }); }
 // PREV (undo): discard the current colouring, revert to before the previous stencil, and re-lay it to recolour
@@ -687,7 +692,7 @@ function runEntry(){ return new Promise(async res=>{
   await wait(400);            // hold on the empty WHITE paper so a first-time player sees the blank canvas...
   let started=false; try{ started=sessionStorage.getItem('ss_started')==='1'; }catch(e){}
   if(!started){ await waitForTap(); try{ sessionStorage.setItem('ss_started','1'); }catch(e){} }   // 'Tap to start' only at session start (first run / reconnect); continuous stage progression skips it
-  if(tutorial){ tutPhase=0; const rb=$('#refBox'); tutShow(rb?rb.getBoundingClientRect():{left:innerWidth-110,top:60,width:104,height:109},'Hold the picture\nto check it! 🖼️',1.7); await waitForMemoCheck(); tutHide(); }   // TUTORIAL: the first stencil unrolls only AFTER the player zooms the goal picture and the popup closes
+  if(tutorial){ tutPhase=0; const rb=$('#refBox'); tutSetGate('#refBox'); tutShow(rb?rb.getBoundingClientRect():{left:innerWidth-110,top:60,width:104,height:109},'Hold the picture\nto check it! 🖼️',1.7); await waitForMemoCheck(); tutHide(); }   // TUTORIAL: only the goal picture is tappable; the first stencil unrolls only AFTER the player zooms it and the popup closes
   await unrollStencil();      // ...then the beige stencil rolls down from the top
   res();
 }); }
