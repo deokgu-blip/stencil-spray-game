@@ -156,7 +156,7 @@
   .btn{font-size:38px;font-weight:800;color:#fff;background:linear-gradient(180deg,#48c79f,#2f9e7e);border:none;border-radius:36px;padding:24px 40px;margin:8px;cursor:pointer;box-shadow:0 10px 0 #237a61,0 14px 24px rgba(0,0,0,.2);min-width:440px;}
   .btns{display:flex;flex-direction:column;align-items:center;gap:18px;margin-top:14px;}
   .btn.disabled{filter:grayscale(1) opacity(.5);pointer-events:none;}
-  .endnote{font-family:'Gloria Hallelujah','Patrick Hand',cursive;font-size:30px;line-height:1.55;color:#9a8c74;margin:30px 16px 2px;white-space:pre-line;}
+  .endnote{font-family:'Gloria Hallelujah','Patrick Hand',cursive;font-size:30px;line-height:1.55;color:#9a8c74;margin:30px 16px 2px;}
   /* NEXT = art-tone coloured primary */
   body.paperui .btn.primary, .btn.primary{background:linear-gradient(180deg,#62b89c,#3f9079)!important;color:#fff!important;text-shadow:0 1px 0 rgba(0,0,0,.18)!important;box-shadow:0 9px 0 #2f7460,0 14px 22px rgba(40,90,70,.3)!important;border:none!important;}
   /* RETRY = underlined text only, no background, sits at the bottom */
@@ -1213,7 +1213,7 @@ function showResult(acc){
     btns += `<button class="btn primary" id="rt">RETRY</button>`;
     btns += galBtn;
   }
-  const endNote = (cleared && isLast) ? `<div class="endnote">Thanks for playing them all! 💛\nNew stages are coming soon.</div>` : '';
+  const endNote = (cleared && isLast) ? `<div class="endnote">Thanks for playing them all!<br>New stages are coming soon.</div>` : '';
   sfx(cleared?'win':'fail'); if(navigator.vibrate)navigator.vibrate([20,40,20,40,40]); p.className='panel'+(assets.sketchPopup?' sketch':''); if(cleared)launchConfetti(acc>=95);   // celebrate only when cleared (>=80%)
   p.innerHTML=`${draw}<div class="praise">${praise}</div><p class="score">ACCURACY ${acc}%</p><div class="btns">${btns}</div>${endNote}`;
   $('#overlay').classList.add('show');
