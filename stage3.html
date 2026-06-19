@@ -442,7 +442,8 @@ function updateWcirc(){ const c=$('#wcirc'); if(!c)return;
 function updateHint(){ const h=$('#canHint'); if(!h)return;
   h.textContent = state==='spraying' ? 'Pick a colour and spray inside the lines — tap ✓ when done' : ''; }
 function buildCarousel(){ buildBottom(); }   // alias (legacy callers)
-function fillDab(x,y){ paintedThisStep=true; const r=brushR(); sweepCtx.globalAlpha=1; sweepCtx.fillStyle=selColor; sweepCtx.beginPath(); sweepCtx.arc(x,y,r,0,7); sweepCtx.fill();
+function fillDab(x,y){ paintedThisStep=true; if(tutorial&&tutPhase===1)tutHide();   // hide the 'spray here' guide once colouring starts (next-button guide returns at 60%+release)
+  const r=brushR(); sweepCtx.globalAlpha=1; sweepCtx.fillStyle=selColor; sweepCtx.beginPath(); sweepCtx.arc(x,y,r,0,7); sweepCtx.fill();
   if(spParts.length<120) for(let i=0;i<3;i++){ const a=Math.random()*7, sp=1+Math.random()*4; spParts.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1,life:1,c:selColor}); } }   // cap particle count (perf)
 function fillSpray(x,y){ if(!selColor||state!=='spraying')return; if(tutorial&&tutPhase===0)return;   // block spraying during the 'check the picture' step so the spray guide is always seen first
   if(!nozzle.show){nozzle.show=true; sprayLoopOn(); setHint('');} fillDab(x,y); lastFill={x,y}; nozzle.x=x;nozzle.y=y; ensureDraw(); }
@@ -535,7 +536,9 @@ function tutShow(rect,text,pad){ if(!rect)return; const tut=$('#tut'),c=$('#tutC
   c.style.left=cx+'px'; c.style.top=cy+'px'; c.style.width=sz+'px'; c.style.height=sz+'px'; c.style.setProperty('--trot',((Math.random()*16-8)|0)+'deg');
   tx.textContent=text; tut.classList.add('show'); c.classList.remove('draw'); void c.offsetWidth; c.classList.add('draw'); }
 function tutHide(){ const t=$('#tut'); if(t)t.classList.remove('show'); }
-function tutStart(){ if(!tutorial)return; tutPhase=0; tutShow($('#refBox').getBoundingClientRect(),'Check the picture\nyou will make! 🖼️',1.7); setTimeout(tutSpray,2600); }
+function tutStart(){ if(!tutorial)return; tutPhase=0; tutShow($('#refBox').getBoundingClientRect(),'Tap the picture\nto check it! 🖼️',1.7);
+  const rb=$('#refBox'); if(rb){ const h=()=>{ if(tutPhase!==0)return; rb.removeEventListener('click',h); tutSpray(); }; rb.addEventListener('click',h); }   // advance only when the player taps the goal picture
+  setTimeout(()=>{ if(tutPhase===0)tutSpray(); }, 14000); }   // safety fallback so it never hangs
 function tutSpray(){ if(!tutorial||tutPhase!==0)return; tutPhase=1; const ci=STAGE_COLORS.indexOf(active&&active.color); selectCan(ci>=0?ci:0);
   tutShow(playCv.getBoundingClientRect(),'Hold & spray to fill\nthe white shape!',0.62); }
 function tutCheck(){ if(!tutorial||tutPhase!==1)return; if(regionCoverage()>=0.6){ tutPhase=2; markReady(); tutShow($('#doneBtn').getBoundingClientRect(),'Nicely done!\nTap to continue →',2.0); } }
