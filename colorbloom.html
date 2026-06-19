@@ -156,6 +156,7 @@
   .btn{font-size:38px;font-weight:800;color:#fff;background:linear-gradient(180deg,#48c79f,#2f9e7e);border:none;border-radius:36px;padding:24px 40px;margin:8px;cursor:pointer;box-shadow:0 10px 0 #237a61,0 14px 24px rgba(0,0,0,.2);min-width:440px;}
   .btns{display:flex;flex-direction:column;align-items:center;gap:18px;margin-top:14px;}
   .btn.disabled{filter:grayscale(1) opacity(.5);pointer-events:none;}
+  .endnote{font-family:'Gloria Hallelujah','Patrick Hand',cursive;font-size:30px;line-height:1.55;color:#9a8c74;margin:30px 16px 2px;white-space:pre-line;}
   /* NEXT = art-tone coloured primary */
   body.paperui .btn.primary, .btn.primary{background:linear-gradient(180deg,#62b89c,#3f9079)!important;color:#fff!important;text-shadow:0 1px 0 rgba(0,0,0,.18)!important;box-shadow:0 9px 0 #2f7460,0 14px 22px rgba(40,90,70,.3)!important;border:none!important;}
   /* RETRY = underlined text only, no background, sits at the bottom */
@@ -1201,20 +1202,22 @@ function showResult(acc){
   const praise = acc>=95?'Beautiful work!' : acc>=85?'Lovely colouring!' : acc>=80?'Nicely done!' : 'Almost there!';
   const draw=`<div class="rdraw pop"><img src="${pic}"></div>`;
   // buttons by accuracy: ≥80 -> NEXT ; <100 -> RETRY ; SKETCHBOOK always (disabled/grey when nothing collected yet)
+  const isLast = COMBINED ? (curIdx>=STAGES.length-1) : !!STAGE.last;   // final stage -> block NEXT, show the thank-you note
   const galBtn = `<button class="btn book${hasGallery?'':' disabled'}" id="gal">SKETCHBOOK</button>`;
   let btns='';
   if(cleared){                                                  // >=80%: advance is the main action
-    btns += `<button class="btn primary" id="nx">NEXT</button>`;     // art-tone coloured primary
+    btns += `<button class="btn primary${isLast?' disabled':''}" id="nx">NEXT</button>`;   // last stage -> disabled (no next stage)
     btns += galBtn;                                                  // paper
     if(acc<100) btns += `<button class="btn retry" id="rt">RETRY</button>`;   // optional underlined text at the bottom
   } else {                                                      // <80%: RETRY is the main action (coloured, on top); no text retry
     btns += `<button class="btn primary" id="rt">RETRY</button>`;
     btns += galBtn;
   }
+  const endNote = (cleared && isLast) ? `<div class="endnote">Thanks for playing them all! 💛\nNew stages are coming soon.</div>` : '';
   sfx(cleared?'win':'fail'); if(navigator.vibrate)navigator.vibrate([20,40,20,40,40]); p.className='panel'+(assets.sketchPopup?' sketch':''); if(cleared)launchConfetti(acc>=95);   // celebrate only when cleared (>=80%)
-  p.innerHTML=`${draw}<div class="praise">${praise}</div><p class="score">ACCURACY ${acc}%</p><div class="btns">${btns}</div>`;
+  p.innerHTML=`${draw}<div class="praise">${praise}</div><p class="score">ACCURACY ${acc}%</p><div class="btns">${btns}</div>${endNote}`;
   $('#overlay').classList.add('show');
-  const nx=$('#nx'); if(nx) nx.onclick=()=>{ if(COMBINED) goStage(curIdx+1); else if(STAGE.next)location.href=STAGE.next; else location.reload(); };   // in-file advance (combined) / navigate (single)
+  const nx=$('#nx'); if(nx && !isLast) nx.onclick=()=>{ if(COMBINED) goStage(curIdx+1); else if(STAGE.next)location.href=STAGE.next; else location.reload(); };   // in-file advance (combined) / navigate (single); blocked on the last stage
   const rt=$('#rt'); if(rt) rt.onclick=()=>{ if(COMBINED) goStage(curIdx); else location.reload(); };   // retry the same stage
   const gal=$('#gal'); if(gal && hasGallery) gal.onclick=openGallery;               // disabled when empty -> no handler
 }
