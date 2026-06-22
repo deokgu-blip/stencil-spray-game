@@ -2194,7 +2194,7 @@ async function reconstructAllParts(){
   const provider=wEls.provider.value;
   const key=(wEls.key.value||'').trim();
   if(!key){ wSetReconStatus('API 키를 먼저 입력하세요.'); showToast('❌ 진행 불가: API 키를 먼저 입력하세요','bad'); return; }
-  const imgModel=(wEls.imgModel.value||'').trim() || AI_IMG_DEFAULT_MODEL[provider];
+  const imgModel=((wEls.imgModel.value||'').trim().replace(/\s+/g,'-')) || AI_IMG_DEFAULT_MODEL[provider];  // auto-fix spaces -> hyphens
   // skip 1×1 placeholder parts (empty bones)
   const targets=wstate.parts.filter(p=>p.canvas && p.canvas.width>2 && p.canvas.height>2);
   if(!targets.length){ wSetReconStatus('재구성할 만한 부위가 없어요.'); return; }
@@ -2253,7 +2253,7 @@ async function analyzeWithAI(){
   const provider=wEls.provider.value;
   const key=(wEls.key.value||'').trim();
   if(!key){ wSetStatusState('API 키를 먼저 입력하세요.', 'bad'); showToast('❌ 진행 불가: API 키를 먼저 입력하세요','bad'); return; }
-  const model=(wEls.model.value||'').trim() || AI_DEFAULT_MODEL[provider];
+  const model=((wEls.model.value||'').trim().replace(/\s+/g,'-')) || AI_DEFAULT_MODEL[provider];  // model IDs use hyphens, never spaces — auto-fix "gpt image-2" -> "gpt-image-2"
   // source data URI at modest size to keep payload small
   const srcURI = wEls.srcImg.src && wEls.srcImg.src.startsWith('data:') ? wEls.srcImg.src : null;
   let dataURI=srcURI;
