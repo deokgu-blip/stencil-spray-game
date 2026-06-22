@@ -148,7 +148,7 @@
   <span class="sub" id="subText">Spin: top-view PNG &rarr; faux-3D rotation sheet</span>
   <div class="modebar">
     <button class="modebtn active" id="btnSpin">&#127744; Spin</button>
-    <button class="modebtn" id="btnWalk">&#128694; Walk</button>
+    <button class="modebtn" id="btnWalk">&#129302; Animate</button>
   </div>
 </header>
 
@@ -177,6 +177,7 @@
             <option value="patty">Round Patty (beveled)</option>
             <option value="smooth" selected>Smooth / Inflation (pillow)</option>
             <option value="sphere">Sphere (full ball)</option>
+            <option value="cube">Cube / Box (square &rarr; cube)</option>
           </select>
         </label>
         <label class="row">
@@ -225,46 +226,72 @@
       <div class="hint" id="status">Load a PNG to begin.</div>
     </div>
 
-    <!-- ============ WALK CONTROLS ============ -->
+    <!-- ============ ANIMATE CONTROLS ============ -->
     <div class="panel-controls hidden" id="walkControls">
       <div class="group">
-        <h3>Character image</h3>
+        <h3>Creature image</h3>
         <div class="drop" id="wdrop">
-          <div><b>Drop a humanoid PNG</b></div>
-          <div style="margin-top:4px">or click to choose &middot; standing, transparent bg</div>
+          <div><b>Drop any creature PNG</b></div>
+          <div style="margin-top:4px">human, bird, fish, snake&hellip; &middot; transparent bg</div>
           <input type="file" id="wfile" accept="image/png,image/*" style="display:none" />
         </div>
-        <div class="src-preview" id="wsrcPrev"><img id="wsrcImg" alt="character"/></div>
+        <div class="src-preview" id="wsrcPrev"><img id="wsrcImg" alt="creature"/></div>
         <button class="ghost" id="wPasteBtn" style="margin-top:10px;width:100%">📋 Paste image (or ⌘/Ctrl+V)</button>
       </div>
 
       <div class="group">
-        <h3>Skeleton (auto-rigged)</h3>
-        <div class="hint" style="margin-top:0">Drag the joint handles on the stage to fit the
-          skeleton to your art. Side-view reads best.</div>
+        <h3>🤖 AI rig &amp; motions</h3>
+        <div class="hint" style="margin-top:0">The AI looks at the image and authors a bone graph
+          + keyframed motions for whatever body plan it sees. Playback is fully local.</div>
+        <label class="row">
+          <div class="lab"><span>Provider</span></div>
+          <select id="aiProvider">
+            <option value="gemini" selected>Gemini</option>
+            <option value="openai">OpenAI</option>
+          </select>
+        </label>
+        <label class="row" style="display:block">
+          <div class="lab"><span>API key</span></div>
+          <input type="password" id="aiKey" placeholder="paste your key (used in-browser only)" autocomplete="off" />
+        </label>
+        <label class="row" style="flex-direction:row; align-items:center; gap:8px; justify-content:flex-start">
+          <input type="checkbox" id="aiRemember" style="width:auto" />
+          <span style="font-size:12px;color:var(--muted)">remember key in this browser (localStorage)</span>
+        </label>
+        <label class="row" style="display:block">
+          <div class="lab"><span>Model (optional)</span></div>
+          <input type="text" id="aiModel" placeholder="gemini-2.0-flash / gpt-4o-mini" autocomplete="off" />
+        </label>
+        <button class="ghost" id="aiAnalyzeBtn" style="width:100%;margin-top:4px" disabled>🤖 Analyze with AI</button>
+        <div class="hint" style="margin-top:6px;font-size:11px;line-height:1.5">
+          ⚠️ The key is exposed in the browser — use your own key for local use only.
+          AI calls may be blocked from <code>file://</code>; if so, open the hosted https link
+          or run a local server.</div>
+      </div>
+
+      <div class="group">
+        <h3>Rig (drag to fix)</h3>
+        <div class="hint" style="margin-top:0">Circles are joints; lines are bones. Drag a handle to
+          align the rig to your art, then it re-skins automatically.</div>
         <div class="toolbar" style="margin-top:10px">
-          <button class="ghost" id="wResetBtn">Reset skeleton</button>
+          <button class="ghost" id="wResetBtn">Reset rig</button>
           <button class="ghost" id="wRebuildBtn">Re-skin parts</button>
         </div>
       </div>
 
       <div class="group">
-        <h3>Walk tuning</h3>
+        <h3>Motion</h3>
         <label class="row">
-          <div class="lab"><span>Stride (leg swing)</span><b id="wStrideVal">0.55</b></div>
-          <input type="range" id="wStride" min="0" max="1.2" step="0.01" value="0.55"/>
-        </label>
-        <label class="row">
-          <div class="lab"><span>Arm swing</span><b id="wArmVal">0.50</b></div>
-          <input type="range" id="wArm" min="0" max="1.2" step="0.01" value="0.50"/>
-        </label>
-        <label class="row">
-          <div class="lab"><span>Bounce (vertical bob)</span><b id="wBounceVal">0.50</b></div>
-          <input type="range" id="wBounce" min="0" max="1.5" step="0.01" value="0.50"/>
+          <div class="lab"><span>Motion</span></div>
+          <select id="aiMotion"></select>
         </label>
         <label class="row">
           <div class="lab"><span>Speed (preview)</span><b id="wSpeedVal">1.00</b></div>
           <input type="range" id="wSpeed" min="0.2" max="2.5" step="0.01" value="1.0"/>
+        </label>
+        <label class="row">
+          <div class="lab"><span>Amount (×)</span><b id="wStrideVal">1.00</b></div>
+          <input type="range" id="wStride" min="0" max="2.0" step="0.01" value="1.0"/>
         </label>
       </div>
 
@@ -289,8 +316,8 @@
         </label>
       </div>
 
-      <button class="primary" id="wBakeBtn" disabled>Bake Walk Sheet</button>
-      <div class="hint" id="wStatus">Load a character to begin.</div>
+      <button class="primary" id="wBakeBtn" disabled>Bake Motion Sheet</button>
+      <div class="hint" id="wStatus">Load a creature to begin.</div>
     </div>
   </aside>
 
@@ -324,23 +351,23 @@
       </div>
     </div>
 
-    <!-- ============ WALK STAGE ============ -->
+    <!-- ============ ANIMATE STAGE ============ -->
     <div class="panel-stage hidden" id="walkStage">
       <div class="card live-wrap">
         <h2>Rig editor — drag joints to fit</h2>
         <canvas id="walkRigCanvas"></canvas>
-        <div class="hint">Circles are joints; lines are bones. Drag a handle to align the skeleton to your character, then it re-skins automatically.</div>
+        <div class="hint">Circles are joints; lines are bones. Drag a handle to align the rig to your art, then it re-skins automatically.</div>
       </div>
 
       <div class="card live-wrap" id="walkPrevCard" style="display:none">
-        <h2>Live walk preview</h2>
+        <h2>Live motion preview</h2>
         <canvas id="walkPreviewCanvas"></canvas>
-        <div class="hint">Looping the built-in walk cycle. Tune stride / arm swing / bounce on the left.</div>
+        <div class="hint">Looping the selected motion. Pick a motion &amp; tune speed / amount on the left.</div>
       </div>
 
       <div class="card bake-out" id="wBakeOut">
-        <h2>Baked walk sheet</h2>
-        <div class="strip-scroll"><img id="wStripImg" alt="walk strip"/></div>
+        <h2>Baked motion sheet</h2>
+        <div class="strip-scroll"><img id="wStripImg" alt="motion strip"/></div>
         <div class="flip-row">
           <div class="flip-box">
             <canvas id="walkFlipCanvas" width="160" height="160"></canvas>
@@ -354,7 +381,7 @@
       </div>
 
       <div class="card" id="wEmptyCard">
-        <div class="empty">No walk sheet baked yet. Load a humanoid PNG, fit the skeleton, then press <b>Bake Walk Sheet</b>.</div>
+        <div class="empty">No motion sheet baked yet. Load a creature PNG, analyze with AI (or use a fallback motion), then press <b>Bake Motion Sheet</b>.</div>
       </div>
     </div>
   </main>
@@ -636,6 +663,7 @@ function buildMesh(){
   if (!state.height || !state.texture) return;
 
   if (state.mode === 'sphere'){ buildSphereMesh(); positionMesh(); return; }
+  if (state.mode === 'cube'){ buildCubeMesh(); positionMesh(); return; }
 
   const { dist, w, h, mask } = state.height;
   const aspect = w / h;
@@ -853,6 +881,23 @@ function buildSphereMesh(){
   state.worldW = state.worldH = state.worldD = R*2;
 }
 
+// CUBE / BOX: extrude a (square) image into a box, image mapped on all faces.
+// Thickness slider drives depth: ~1 = cube, lower = flat box/card.
+function buildCubeMesh(){
+  const { w, h } = state.height;
+  const aspect = w/h;
+  let bw, bh;
+  if (aspect >= 1){ bw = 2; bh = 2/aspect; } else { bh = 2; bw = 2*aspect; }
+  const depth = Math.max(0.02, state.thickness) * Math.min(bw, bh);   // thickness 1 -> ~cube
+  const geo = new THREE.BoxGeometry(bw, bh, depth);                   // default UVs map the full image onto each face
+  const mat = new THREE.MeshStandardMaterial({
+    map: state.texture, transparent: false, side: THREE.FrontSide, roughness: 0.7, metalness: 0.0,
+  });
+  mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+  state.worldW = bw; state.worldH = bh; state.worldD = depth;
+}
+
 function positionMesh(){
   if (!mesh) return;
   mesh.position.set(0,0,0);
@@ -1063,36 +1108,37 @@ initThree();
 
 
 /* ============================================================
-   FUNCTION (B) — WALK RIG  (2D cutout / paper-doll, no ML, no CDN)
-   Pipeline: humanoid PNG -> alpha mask + bbox
-             -> auto-place 16-joint skeleton (proportional)
-             -> user drags joints -> nearest-bone skinning into parts
-             -> hierarchical part transforms driven by a built-in
-                walk cycle -> live preview -> bake N-frame strip PNG.
+   FUNCTION (B) — ANIMATE  (generic AI-authored rig + procedural playback)
+   No ML in the browser, no CDN. The AI (Gemini/OpenAI vision) authors a
+   bone graph (joints with parents) + keyframed motions PER IMAGE; this
+   tool is a generic playback + bake engine that works for ANY body plan
+   (human, bird, rabbit, snake, fish…) and ANY motion.
+   Pipeline: creature PNG -> alpha mask + bbox
+             -> rig (joints[] with parents) from AI / fallback / manual
+             -> nearest-bone-segment skinning -> one cutout part per bone
+             -> motion = per-joint angle tracks over t∈[0,1]
+             -> cumulative-delta hierarchy transform -> live preview
+             -> bake N-frame strip PNG.
    ============================================================ */
 
 const wstate = {
   img: null,
   imgW: 0, imgH: 0,
-  // working raster of the source character (for skinning + drawing parts)
   rc: null, rctx: null, rw: 0, rh: 0,
+  rdata: null,
   mask: null,            // Uint8Array rw*rh (1 = opaque)
   bbox: null,            // {x0,y0,x1,y1,w,h} in raster coords
-  joints: {},            // name -> [x,y] in raster coords (CURRENT, user-editable)
-  autoJoints: {},        // the auto-rig guess (for Reset)
-  parts: [],             // skinned parts (see buildParts)
-  basename: 'character',
-  // tuning
-  stride: 0.55, armSwing: 0.50, bounce: 0.50, speed: 1.0,
+  joints: [],            // [{name,x,y,parent}] in RASTER coords (CURRENT, editable)
+  autoJoints: [],        // the rig as last built (for Reset)
+  parts: [],             // skinned parts (one per bone) — see buildParts()
+  motions: [],           // [{name,frames,fps,loop,tracks:[{joint,keys:[{t,deg}]}]}]
+  motionName: null,      // selected motion name
+  creature: '',
+  basename: 'creature',
+  speed: 1.0,            // preview playback speed
+  amount: 1.0,           // global motion amplitude multiplier
   frames: 12, frameSize: 256,
 };
-
-/* joint name list (16) */
-const JOINT_NAMES = [
-  'head','neck','chest','pelvis',
-  'shoulderL','shoulderR','elbowL','elbowR','wristL','wristR',
-  'hipL','hipR','kneeL','kneeR','ankleL','ankleR'
-];
 
 /* ---- raster the source into a working canvas + mask + bbox ---- */
 function wRasterize(img){
@@ -1128,107 +1174,258 @@ function wRasterize(img){
 }
 
 /* per-row horizontal center of mass of the silhouette (for body center line) */
-function rowCenters(mask,w,h,bbox){
-  const cen=new Float32Array(h); // x center per row (raster coords); NaN if empty
+function rowCenters(mask,w,h){
+  const cen=new Float32Array(h);
   for(let y=0;y<h;y++){ let sum=0,cnt=0; for(let x=0;x<w;x++){ if(mask[y*w+x]){sum+=x;cnt++;} } cen[y]=cnt?sum/cnt:NaN; }
   return cen;
 }
 
-/* ---- AUTO-PLACE the default humanoid skeleton ---- */
-function autoPlaceSkeleton(bbox, centers){
+/* ============================================================
+   GENERIC RIG MODEL
+   joints: array of { name, x, y, parent }  (x,y normalized 0..1 OR raster px)
+   We always store wstate.joints in RASTER pixel coords with numeric x,y.
+   ============================================================ */
+
+/* Default fallback rig when no AI / no analysis available: a simple
+   4-joint "blob" rig (root + head + 2 side limbs) derived from the bbox.
+   Works for anything; gives the fallback motions something to move. */
+function fallbackRig(bbox, centers){
   const {x0,y0,w,h}=bbox;
-  // vertical fractions of bbox height
-  const Y=(f)=> y0 + f*h;
-  // horizontal center line: use row CoM at that height, fallback to bbox mid
-  const midX = x0 + w*0.5;
-  const cx=(f)=>{ const yy=Math.round(Y(f)); const c=centers&&centers[yy]; return (c!=null && !isNaN(c))? c : midX; };
-  // limb spread as fraction of bbox width
-  const armSpread = w*0.30;   // shoulder/arm offset from center
-  const hipSpread = w*0.16;   // hip offset
-  const J={};
-  J.head      = [cx(0.07), Y(0.07)];
-  J.neck      = [cx(0.17), Y(0.17)];
-  J.chest     = [cx(0.27), Y(0.27)];
-  J.pelvis    = [cx(0.52), Y(0.52)];
-  J.shoulderL = [cx(0.22)-armSpread, Y(0.22)];
-  J.shoulderR = [cx(0.22)+armSpread, Y(0.22)];
-  J.elbowL    = [cx(0.36)-armSpread*1.02, Y(0.38)];
-  J.elbowR    = [cx(0.36)+armSpread*1.02, Y(0.38)];
-  J.wristL    = [cx(0.50)-armSpread*1.0,  Y(0.52)];
-  J.wristR    = [cx(0.50)+armSpread*1.0,  Y(0.52)];
-  J.hipL      = [cx(0.52)-hipSpread, Y(0.53)];
-  J.hipR      = [cx(0.52)+hipSpread, Y(0.53)];
-  J.kneeL     = [cx(0.75)-hipSpread*0.9, Y(0.75)];
-  J.kneeR     = [cx(0.75)+hipSpread*0.9, Y(0.75)];
-  J.ankleL    = [cx(0.96)-hipSpread*0.8, Y(0.97)];
-  J.ankleR    = [cx(0.96)+hipSpread*0.8, Y(0.97)];
-  return J;
+  const midX=x0+w*0.5;
+  const Y=(f)=>y0+f*h;
+  const cx=(f)=>{ const yy=Math.round(Y(f)); const c=centers&&centers[yy]; return (c!=null&&!isNaN(c))?c:midX; };
+  return [
+    { name:'root',  x:cx(0.55), y:Y(0.55), parent:null },
+    { name:'head',  x:cx(0.18), y:Y(0.18), parent:'root' },
+    { name:'limbL', x:cx(0.55)-w*0.34, y:Y(0.62), parent:'root' },
+    { name:'limbR', x:cx(0.55)+w*0.34, y:Y(0.62), parent:'root' },
+    { name:'tail',  x:cx(0.95), y:Y(0.95), parent:'root' },
+  ];
 }
 
-/* bone list: [name, jointA, jointB, partKey, parentPart, driver] */
-function boneSpec(){
+/* Validate + clamp an AI / injected rig JSON into wstate-ready joints.
+   Accepts joints with normalized (0..1) or raster coords; auto-detects. */
+function normalizeRigJSON(json, rw, rh){
+  if(!json || !Array.isArray(json.joints) || json.joints.length<2)
+    throw new Error('rig JSON needs joints[] (>=2)');
+  // detect coordinate space: if any coord >1.5 we assume raster px already
+  let maxC=0;
+  for(const j of json.joints){ maxC=Math.max(maxC, Math.abs(+j.x||0), Math.abs(+j.y||0)); }
+  const normalized = maxC <= 1.5;
+  const seen={}; const joints=[];
+  for(const j of json.joints){
+    if(!j || typeof j.name!=='string' || !j.name) continue;
+    if(seen[j.name]) continue; seen[j.name]=1;
+    let x=+j.x, y=+j.y; if(!isFinite(x))x=0.5; if(!isFinite(y))y=0.5;
+    if(normalized){ x=Math.max(0,Math.min(1,x))*(rw-1); y=Math.max(0,Math.min(1,y))*(rh-1); }
+    else { x=Math.max(0,Math.min(rw-1,x)); y=Math.max(0,Math.min(rh-1,y)); }
+    joints.push({ name:j.name, x, y, parent:(j.parent==null?null:String(j.parent)) });
+  }
+  if(joints.length<2) throw new Error('rig JSON has <2 valid joints');
+  // resolve parents: drop dangling parents -> null; break cycles -> null
+  const byName={}; joints.forEach(j=>byName[j.name]=j);
+  for(const j of joints){ if(j.parent!=null && !byName[j.parent]) j.parent=null; }
+  // cycle break: walk up; if we loop, sever
+  for(const j of joints){
+    let cur=j, hops=0; const path={};
+    while(cur && cur.parent!=null){
+      if(path[cur.name]){ cur.parent=null; break; }
+      path[cur.name]=1; cur=byName[cur.parent]; if(++hops>joints.length){ j.parent=null; break; }
+    }
+  }
+  // ensure at least one root
+  if(!joints.some(j=>j.parent==null)) joints[0].parent=null;
+  return joints;
+}
+
+/* Validate + clamp motions JSON. Returns array of clean motions. */
+function normalizeMotions(arr){
+  if(!Array.isArray(arr)) return [];
+  const out=[];
+  for(const m of arr){
+    if(!m || typeof m.name!=='string' || !m.name) continue;
+    const frames=Math.max(2, Math.min(64, (+m.frames|0)||12));
+    const fps=Math.max(1, Math.min(60, (+m.fps|0)||12));
+    const loop=(m.loop!==false);
+    const tracks=[];
+    if(Array.isArray(m.tracks)){
+      for(const tr of m.tracks){
+        if(!tr || typeof tr.joint!=='string') continue;
+        let keys=Array.isArray(tr.keys)?tr.keys:[];
+        keys=keys.map(k=>({ t:Math.max(0,Math.min(1,+k.t||0)), deg:(+k.deg||0) }))
+                 .sort((a,b)=>a.t-b.t);
+        if(keys.length===0) continue;
+        if(keys[0].t>0) keys.unshift({t:0,deg:keys[0].deg});
+        if(keys[keys.length-1].t<1) keys.push({t:1,deg:keys[keys.length-1].deg});
+        tracks.push({ joint:tr.joint, keys });
+      }
+    }
+    if(tracks.length===0) continue;
+    out.push({ name:m.name, frames, fps, loop, tracks });
+  }
+  return out;
+}
+
+/* sample a track's deg at phase t∈[0,1] via piecewise-linear interp */
+function sampleTrack(keys, t){
+  if(!keys.length) return 0;
+  if(t<=keys[0].t) return keys[0].deg;
+  for(let i=1;i<keys.length;i++){
+    if(t<=keys[i].t){
+      const a=keys[i-1], b=keys[i];
+      const span=Math.max(1e-6,b.t-a.t);
+      const u=(t-a.t)/span;
+      return a.deg+(b.deg-a.deg)*u;
+    }
+  }
+  return keys[keys.length-1].deg;
+}
+
+/* ============================================================
+   BUILT-IN GENERIC FALLBACK MOTIONS
+   Authored procedurally from whatever joints exist (no per-creature
+   templates). 'swing' alternates child limbs left/right of the root;
+   'idle' is a gentle whole-body bob/sway.
+   ============================================================ */
+function buildFallbackMotions(){
+  const J=wstate.joints; if(!J.length) return [];
+  const byName={}; J.forEach(j=>byName[j.name]=j);
+  const roots=J.filter(j=>j.parent==null);
+  const root=roots[0]||J[0];
+  // children of root, split by x relative to root for alternation
+  const kids=J.filter(j=>j.parent===root.name);
+  const childAngle=(j)=> (j.x < root.x ? Math.PI : 0); // left vs right -> phase offset
+  // SWING / WALK fallback: each non-root joint oscillates; alternate by side
+  const swingTracks=[];
+  for(const j of J){
+    if(j.parent==null) continue;
+    const phase = childAngle(byName[j.parent]||j);
+    const sideP = (j.x < root.x ? Math.PI : 0);
+    // amplitude bigger for direct children, smaller deeper down
+    const depth=(()=>{ let d=0,c=j; while(c&&c.parent!=null){ d++; c=byName[c.parent]; } return d; })();
+    const amp = 22 / Math.max(1, depth*0.8);
+    const p = (phase+sideP)%(Math.PI*2);
+    // sine sampled at 0,.25,.5,.75,1 -> keyframes
+    const ks=[0,0.25,0.5,0.75,1].map(t=>({ t, deg: amp*Math.sin(t*Math.PI*2 + p) }));
+    swingTracks.push({ joint:j.name, keys:ks });
+  }
+  // IDLE bob: small whole-body sway driven on the root + slight head/limb breathe
+  const idleTracks=[];
+  idleTracks.push({ joint:root.name, keys:[0,0.5,1].map(t=>({t,deg:3.5*Math.sin(t*Math.PI*2)})) });
+  for(const j of kids){
+    idleTracks.push({ joint:j.name, keys:[0,0.5,1].map(t=>({t,deg:5*Math.sin(t*Math.PI*2 + (j.x<root.x?Math.PI:0))})) });
+  }
   return [
-    // partKey, jointA(pivot/parent joint), jointB(child joint), parentPart, driver
-    {part:'torso',     a:'pelvis', b:'neck',      parent:null,        pivot:'pelvis', driver:'torso'},
-    {part:'head',      a:'neck',   b:'head',      parent:'torso',     pivot:'neck',   driver:'head'},
-    {part:'uarmL',     a:'shoulderL', b:'elbowL', parent:'torso',     pivot:'shoulderL', driver:'armUL'},
-    {part:'larmL',     a:'elbowL', b:'wristL',    parent:'uarmL',     pivot:'elbowL', driver:'armLL'},
-    {part:'uarmR',     a:'shoulderR', b:'elbowR', parent:'torso',     pivot:'shoulderR', driver:'armUR'},
-    {part:'larmR',     a:'elbowR', b:'wristR',    parent:'uarmR',     pivot:'elbowR', driver:'armLR'},
-    {part:'ulegL',     a:'hipL',   b:'kneeL',     parent:'torso',     pivot:'hipL',   driver:'legUL'},
-    {part:'llegL',     a:'kneeL',  b:'ankleL',    parent:'ulegL',     pivot:'kneeL',  driver:'legLL'},
-    {part:'ulegR',     a:'hipR',   b:'kneeR',     parent:'torso',     pivot:'hipR',   driver:'legUR'},
-    {part:'llegR',     a:'kneeR',  b:'ankleR',    parent:'ulegR',     pivot:'kneeR',  driver:'legLR'},
+    { name:'walk/swing', frames:12, fps:12, loop:true, tracks:swingTracks },
+    { name:'idle bob',   frames:12, fps:12, loop:true, tracks:idleTracks },
   ];
+}
+
+/* merge fallback motions in (only those whose names aren't taken) */
+function withFallbackMotions(motions){
+  const names=new Set(motions.map(m=>m.name));
+  const fb=buildFallbackMotions().filter(m=>!names.has(m.name));
+  return motions.concat(fb);
 }
 
 /* angle between two raster points */
 function ang(ax,ay,bx,by){ return Math.atan2(by-ay, bx-ax); }
 
+/* ============================================================
+   BONES — derived from joints[].
+   For each joint C with a parent P, a bone spans P->C, pivots at P,
+   and is driven by the motion track on joint C (rotating C moves the
+   bone + everything below it).  Root joints get a "trunk" bone covering
+   the body core (root point -> centroid of its children), pivoting at
+   the root and driven by track[root].
+   ============================================================ */
+function computeBones(){
+  const J=wstate.joints; const byName={}; J.forEach(j=>byName[j.name]=j);
+  const bones=[];
+  // child bones
+  for(const j of J){
+    if(j.parent==null) continue;
+    const P=byName[j.parent]; if(!P) continue;
+    bones.push({
+      part:'b_'+j.name,
+      ax:P.x, ay:P.y,        // segment start (pivot)
+      bx:j.x, by:j.y,        // segment end
+      pivotName:j.parent,    // pivots at the parent joint
+      driver:j.name,         // rotation driven by track on this joint
+      parentJoint:j.parent,  // hierarchy: this bone's parent bone is the one ending at P
+    });
+  }
+  // root trunk bones
+  for(const j of J){
+    if(j.parent!=null) continue;
+    const kids=J.filter(k=>k.parent===j.name);
+    let bx=j.x, by=j.y;
+    if(kids.length){ bx=kids.reduce((s,k)=>s+k.x,0)/kids.length; by=kids.reduce((s,k)=>s+k.y,0)/kids.length; }
+    else { by=j.y+1; }
+    bones.push({
+      part:'b_'+j.name,
+      ax:j.x, ay:j.y, bx, by,
+      pivotName:j.name,
+      driver:j.name,
+      parentJoint:null,
+    });
+  }
+  return bones;
+}
+
+/* For the cumulative solver: each bone's "parent part" is the bone whose
+   driver joint == this bone's pivot joint (i.e. the bone ending at our
+   pivot).  Root bones have no parent part. */
+function linkBoneParents(bones){
+  const byDriver={}; bones.forEach(b=>{ byDriver[b.driver]=b; });
+  for(const b of bones){
+    b.parent = (b.parentJoint!=null && byDriver[b.parentJoint]) ? byDriver[b.parentJoint].part : null;
+  }
+}
+
 /* ---- SKINNING: nearest-bone-segment assignment -> per-part crops ---- */
 function buildParts(){
   const J=wstate.joints, mask=wstate.mask, w=wstate.rw, h=wstate.rh, data=wstate.rdata;
-  if(!mask) return;
-  const bones=boneSpec();
-  // Each skinning segment = a bone we assign pixels to.
-  // (torso also catches chest/neck column; head catches the head blob.)
-  const segs = bones.map((bs)=>{
-    const A=J[bs.a], B=J[bs.b];
-    return { part:bs.part, ax:A[0], ay:A[1], bx:B[0], by:B[1] };
-  });
-  // dist from point to segment
+  if(!mask || !J.length){ wstate.parts=[]; return; }
+  const bones=computeBones();
+  linkBoneParents(bones);
+  const byName={}; J.forEach(j=>byName[j.name]=j);
+  // skinning segments (one per bone)
+  const segs=bones.map(b=>({ part:b.part, ax:b.ax, ay:b.ay, bx:b.bx, by:b.by }));
   const segDist=(px,py,s)=>{
     const vx=s.bx-s.ax, vy=s.by-s.ay; const wx=px-s.ax, wy=py-s.ay;
-    const len2=vx*vx+vy*vy; let t = len2>0 ? (wx*vx+wy*vy)/len2 : 0;
+    const len2=vx*vx+vy*vy; let t=len2>0?(wx*vx+wy*vy)/len2:0;
     t=Math.max(0,Math.min(1,t));
     const cx=s.ax+t*vx, cy=s.ay+t*vy; const dx=px-cx, dy=py-cy;
     return dx*dx+dy*dy;
   };
-  // assignment buffer
-  const assign = new Int16Array(w*h).fill(-1);
-  // per-part bbox accumulation
-  const pb = {}; bones.forEach(b=>pb[b.part]={x0:1e9,y0:1e9,x1:-1,y1:-1,count:0});
+  const assign=new Int16Array(w*h).fill(-1);
+  const pb={}; bones.forEach(b=>pb[b.part]={x0:1e9,y0:1e9,x1:-1,y1:-1,count:0});
   for(let y=0;y<h;y++){
     for(let x=0;x<w;x++){
       const i=y*w+x; if(!mask[i]) continue;
       let best=-1,bd=1e18;
       for(let s=0;s<segs.length;s++){ const d=segDist(x+0.5,y+0.5,segs[s]); if(d<bd){bd=d;best=s;} }
       assign[i]=best;
-      const part=segs[best].part, B=pb[part];
+      const B=pb[segs[best].part];
       if(x<B.x0)B.x0=x; if(y<B.y0)B.y0=y; if(x>B.x1)B.x1=x; if(y>B.y1)B.y1=y; B.count++;
     }
   }
-  // Build a crop canvas per part with ONLY its pixels (slight feather margin for overlap).
   const MARGIN=3;
   const parts=[];
-  for(const bs of bones){
-    const B=pb[bs.part];
-    if(B.count<1){ // empty part -> still make a 1px placeholder so transforms don't break
-      parts.push({ ...bs, ox:Math.round(J[bs.pivot][0]), oy:Math.round(J[bs.pivot][1]),
-        cw:1, ch:1, canvas:document.createElement('canvas'),
-        restAngle:ang(J[bs.a][0],J[bs.a][1],J[bs.b][0],J[bs.b][1]),
-        pivotX:J[bs.pivot][0], pivotY:J[bs.pivot][1] });
-      parts[parts.length-1].canvas.width=1; parts[parts.length-1].canvas.height=1;
+  for(let bi=0; bi<bones.length; bi++){
+    const b=bones[bi];
+    const pivot=byName[b.pivotName] || {x:b.ax,y:b.ay};
+    const B=pb[b.part];
+    const base={
+      part:b.part, parent:b.parent, driver:b.driver,
+      pivotName:b.pivotName,
+      pivotX:pivot.x, pivotY:pivot.y,
+      restAngle:ang(b.ax,b.ay,b.bx,b.by),
+    };
+    if(B.count<1){
+      const cv=document.createElement('canvas'); cv.width=1; cv.height=1;
+      parts.push({ ...base, ox:Math.round(pivot.x), oy:Math.round(pivot.y), cw:1, ch:1, canvas:cv });
       continue;
     }
     const x0=Math.max(0,B.x0-MARGIN), y0=Math.max(0,B.y0-MARGIN);
@@ -1237,84 +1434,67 @@ function buildParts(){
     const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
     const cc=cv.getContext('2d');
     const out=cc.createImageData(cw,ch);
-    const segIdx=segs.findIndex(s=>s.part===bs.part);
     for(let yy=0;yy<ch;yy++){
       for(let xx=0;xx<cw;xx++){
         const sx=x0+xx, sy=y0+yy, si=sy*w+sx;
-        if(mask[si] && assign[si]===segIdx){
+        if(mask[si] && assign[si]===bi){
           const di=(yy*cw+xx)*4, sd=si*4;
           out.data[di]=data[sd]; out.data[di+1]=data[sd+1]; out.data[di+2]=data[sd+2]; out.data[di+3]=data[sd+3];
         }
       }
     }
     cc.putImageData(out,0,0);
-    parts.push({
-      ...bs,
-      ox:x0, oy:y0, cw, ch, canvas:cv,
-      restAngle: ang(J[bs.a][0],J[bs.a][1],J[bs.b][0],J[bs.b][1]),
-      pivotX: J[bs.pivot][0], pivotY: J[bs.pivot][1],
-    });
+    parts.push({ ...base, ox:x0, oy:y0, cw, ch, canvas:cv });
   }
-  // order so parents render before/under children appropriately:
-  // legs & arms behind torso for a side-walk look; keep simple stable order.
-  const zorder=['ulegR','llegR','uarmR','larmR','torso','head','ulegL','llegL','uarmL','larmL'];
-  parts.sort((p,q)=> zorder.indexOf(p.part)-zorder.indexOf(q.part));
+  // z-order: deeper joints + sides drawn around the trunk. Sort by depth so
+  // roots/trunk render first (under), limbs over.  Keep a stable result.
+  const depthOf={}; const byPart={}; parts.forEach(p=>byPart[p.part]=p);
+  const depth=(p)=>{ let d=0,c=p; const seen={}; while(c&&c.parent&&byPart[c.parent]&&!seen[c.part]){ seen[c.part]=1; d++; c=byPart[c.parent]; } return d; };
+  parts.forEach(p=>depthOf[p.part]=depth(p));
+  parts.sort((a,c)=> depthOf[a.part]-depthOf[c.part]);
   wstate.parts=parts;
 }
 
-/* ---- WALK CYCLE: phase t in [0,1) -> driver angle deltas (radians) ---- */
-function walkPose(t){
-  const TAU=Math.PI*2;
-  const ph=t*TAU;
-  const stride=wstate.stride, arm=wstate.armSwing, bounce=wstate.bounce;
-  // leg swing: opposite legs. positive = swing forward (screen +x for side view)
-  const legUL =  stride*0.9*Math.sin(ph);
-  const legUR =  stride*0.9*Math.sin(ph+Math.PI);
-  // knees bend when leg is in back/lift portion of the cycle (flexion only)
-  const knee = (s)=> stride*1.0*Math.max(0, Math.sin(s+Math.PI*0.5))*0.8;
-  const legLL = -knee(ph);            // bend backward (negative = heel up)
-  const legLR = -knee(ph+Math.PI);
-  // arms counter-swing (left arm with right leg)
-  const armUL =  arm*0.8*Math.sin(ph+Math.PI);
-  const armUR =  arm*0.8*Math.sin(ph);
-  const armLL = -arm*0.35*Math.max(0,Math.sin(ph));        // slight forearm bend
-  const armLR = -arm*0.35*Math.max(0,Math.sin(ph+Math.PI));
-  // torso lean + head bob (subtle)
-  const torso = 0.04*Math.sin(ph*2);
-  const head  = 0.03*Math.sin(ph*2+0.5);
-  // vertical bob: body rises twice per stride (when a leg passes under)
-  const bob = bounce * 0.06 * (0.5 - 0.5*Math.cos(ph*2)); // 0..bounce*0.06, in bbox-height fraction
-  return { legUL,legUR,legLL,legLR, armUL,armUR,armLL,armLR, torso, head, bobFrac:bob };
+/* ============================================================
+   MOTION PLAYBACK — cumulative-delta hierarchy transform.
+   Per joint angle delta (deg->rad) at phase t; applied through parents.
+   Identical math to the proven humanoid cutout transform, but data-driven
+   over the bone graph + arbitrary motion tracks.
+   ============================================================ */
+function currentMotion(){
+  return wstate.motions.find(m=>m.name===wstate.motionName) || wstate.motions[0] || null;
 }
 
-/* ---- compute animated world transforms for parts at phase t ----
-   Pure cumulative-delta model:
-     cum   = own driver delta + sum of ancestor deltas (radians)
-     pivot world pos = parent pivot world + R(parentCum)*(restOffset)
-   The crop is stored at its REST position relative to its pivot, so the
-   drawing rotation is exactly `cum` (no restAngle subtraction).            */
+/* per-joint rotation delta (radians) at phase t for the active motion */
+function jointDeltas(t){
+  const m=currentMotion(); const out={};
+  if(!m) return out;
+  const amt=wstate.amount;
+  for(const tr of m.tracks){
+    out[tr.joint]=(sampleTrack(tr.keys,t)*Math.PI/180)*amt;
+  }
+  return out;
+}
+
 function poseTransforms(t){
-  const pose=walkPose(t);
+  const deltas=jointDeltas(t);
   const parts=wstate.parts;
-  const bbH = wstate.bbox ? wstate.bbox.h : wstate.rh;
-  const bobPx = -pose.bobFrac * bbH;          // body lifts (up = -y)
-  const byName={}; parts.forEach(p=>byName[p.part]=p);
+  const byPart={}; parts.forEach(p=>byPart[p.part]=p);
   const out={};
   function solve(part){
     if(out[part.part]) return out[part.part];
-    const myDelta = pose[part.driver] || 0;
-    if(!part.parent){
-      // root (torso): pivot anchored at pelvis + vertical bob; cum = own lean
-      out[part.part]={ x:part.pivotX, y:part.pivotY + bobPx, cum:myDelta };
+    const myDelta=deltas[part.driver]||0;
+    if(!part.parent || !byPart[part.parent]){
+      out[part.part]={ x:part.pivotX, y:part.pivotY, cum:myDelta };
       return out[part.part];
     }
-    const par=byName[part.parent]; const ps=solve(par);
-    const offx = part.pivotX - par.pivotX;    // rest offset of this pivot from parent pivot
-    const offy = part.pivotY - par.pivotY;
+    const par=byPart[part.parent]; const ps=solve(par);
+    const offx=part.pivotX-par.pivotX;
+    const offy=part.pivotY-par.pivotY;
     const c=Math.cos(ps.cum), s=Math.sin(ps.cum);
-    const px = ps.x + offx*c - offy*s;
-    const py = ps.y + offx*s + offy*c;
-    out[part.part]={ x:px, y:py, cum: ps.cum + myDelta };
+    const px=ps.x+offx*c-offy*s;
+    const py=ps.y+offx*s+offy*c;
+    out[part.part]={ x:px, y:py, cum:ps.cum+myDelta };
     return out[part.part];
   }
   parts.forEach(solve);
@@ -1322,40 +1502,36 @@ function poseTransforms(t){
 }
 
 /* ---- draw a single posed frame into ctx, mapped raster->dest ---- */
-/* fit: {scale, ox, oy} maps raster coords -> dest pixel coords */
 function drawWalkFrame(ctx, t, fit){
   const parts=wstate.parts; if(!parts.length) return;
   const tr=poseTransforms(t);
   for(const p of parts){
     const T=tr[p.part]; if(!T) continue;
     ctx.save();
-    // dest position of this part's animated pivot
-    const dx = fit.ox + T.x*fit.scale;
-    const dy = fit.oy + T.y*fit.scale;
+    const dx=fit.ox+T.x*fit.scale;
+    const dy=fit.oy+T.y*fit.scale;
     ctx.translate(dx,dy);
-    ctx.rotate(T.cum);                       // accumulated delta from rest
+    ctx.rotate(T.cum);
     ctx.scale(fit.scale, fit.scale);
-    // crop drawn so its (rest) pivot lands at the origin
-    ctx.drawImage(p.canvas, p.ox - p.pivotX, p.oy - p.pivotY);
+    ctx.drawImage(p.canvas, p.ox-p.pivotX, p.oy-p.pivotY);
     ctx.restore();
   }
 }
 
-/* fit transform to place the rest pose centered in a square of side S (raster->dest) */
+/* fit transform to place the rest pose centered in a square of side S */
 function walkFit(S){
   const b=wstate.bbox; if(!b) return {scale:1,ox:0,oy:0};
-  const pad=0.16; // leave room for swinging limbs + bob
+  const pad=0.18; // room for swinging limbs
   const span=Math.max(b.w,b.h);
   const scale=(S*(1-pad*2))/span;
-  // center the bbox; nudge up a touch so bob has headroom
   const cx=b.x0+b.w/2, cy=b.y0+b.h/2;
-  const ox=S/2 - cx*scale;
-  const oy=S/2 - cy*scale + S*0.02;
+  const ox=S/2-cx*scale;
+  const oy=S/2-cy*scale;
   return {scale,ox,oy};
 }
 
 /* ============================================================
-   WALK — rig editor canvas (draw character + bones + handles, drag)
+   ANIMATE — rig editor canvas (draw creature + bones + handles, drag)
    ============================================================ */
 const wEls = {
   drop: document.getElementById('wdrop'),
@@ -1367,14 +1543,11 @@ const wEls = {
   prevCard: document.getElementById('walkPrevCard'),
   resetBtn: document.getElementById('wResetBtn'),
   rebuildBtn: document.getElementById('wRebuildBtn'),
-  stride: document.getElementById('wStride'),
-  arm: document.getElementById('wArm'),
-  bounce: document.getElementById('wBounce'),
+  motion: document.getElementById('aiMotion'),
   speed: document.getElementById('wSpeed'),
-  strideVal: document.getElementById('wStrideVal'),
-  armVal: document.getElementById('wArmVal'),
-  bounceVal: document.getElementById('wBounceVal'),
+  stride: document.getElementById('wStride'),
   speedVal: document.getElementById('wSpeedVal'),
+  strideVal: document.getElementById('wStrideVal'),
   frames: document.getElementById('wFrames'),
   frameSize: document.getElementById('wFrameSize'),
   bakeBtn: document.getElementById('wBakeBtn'),
@@ -1385,30 +1558,41 @@ const wEls = {
   flipCanvas: document.getElementById('walkFlipCanvas'),
   caption: document.getElementById('wCaption'),
   dlBtn: document.getElementById('wDlBtn'),
+  // AI controls
+  provider: document.getElementById('aiProvider'),
+  key: document.getElementById('aiKey'),
+  remember: document.getElementById('aiRemember'),
+  model: document.getElementById('aiModel'),
+  analyzeBtn: document.getElementById('aiAnalyzeBtn'),
 };
 function wSetStatus(t){ wEls.status.textContent=t; }
 
-// rig editor: maps raster coords <-> canvas coords (fit character into canvas)
-let rigFit = {scale:1, ox:0, oy:0};
+/* populate the motion dropdown from wstate.motions */
+function refreshMotionDropdown(){
+  const sel=wEls.motion; const prev=wstate.motionName;
+  sel.innerHTML='';
+  for(const m of wstate.motions){
+    const o=document.createElement('option'); o.value=m.name; o.textContent=m.name; sel.appendChild(o);
+  }
+  if(wstate.motions.length){
+    if(!prev || !wstate.motions.some(m=>m.name===prev)) wstate.motionName=wstate.motions[0].name;
+    sel.value=wstate.motionName;
+  } else { wstate.motionName=null; }
+}
+
+/* rig editor: maps raster coords <-> canvas coords */
+let rigFit={scale:1,ox:0,oy:0};
 function computeRigFit(){
   const cv=wEls.rigCanvas;
   const W=cv.width, H=cv.height;
-  const iw=wstate.rw, ih=wstate.rh;
+  const iw=wstate.rw||1, ih=wstate.rh||1;
   const s=Math.min(W/iw, H/ih)*0.92;
-  rigFit={ scale:s, ox:(W - iw*s)/2, oy:(H - ih*s)/2 };
+  rigFit={ scale:s, ox:(W-iw*s)/2, oy:(H-ih*s)/2 };
 }
-const r2cX=(x)=> rigFit.ox + x*rigFit.scale;
-const r2cY=(y)=> rigFit.oy + y*rigFit.scale;
-const c2rX=(x)=> (x - rigFit.ox)/rigFit.scale;
-const c2rY=(y)=> (y - rigFit.oy)/rigFit.scale;
-
-const BONE_DRAW=[
-  ['neck','head'],['pelvis','neck'],['neck','chest'],
-  ['shoulderL','elbowL'],['elbowL','wristL'],['shoulderR','elbowR'],['elbowR','wristR'],
-  ['neck','shoulderL'],['neck','shoulderR'],
-  ['pelvis','hipL'],['pelvis','hipR'],
-  ['hipL','kneeL'],['kneeL','ankleL'],['hipR','kneeR'],['kneeR','ankleR'],
-];
+const r2cX=(x)=>rigFit.ox+x*rigFit.scale;
+const r2cY=(y)=>rigFit.oy+y*rigFit.scale;
+const c2rX=(x)=>(x-rigFit.ox)/rigFit.scale;
+const c2rY=(y)=>(y-rigFit.oy)/rigFit.scale;
 
 function sizeRigCanvas(){
   const cv=wEls.rigCanvas;
@@ -1421,20 +1605,19 @@ function drawRig(){
   const cv=wEls.rigCanvas, ctx=cv.getContext('2d');
   ctx.clearRect(0,0,cv.width,cv.height);
   if(!wstate.rc) return;
-  // draw the source character faint
   ctx.globalAlpha=0.85;
   ctx.drawImage(wstate.rc, rigFit.ox, rigFit.oy, wstate.rw*rigFit.scale, wstate.rh*rigFit.scale);
   ctx.globalAlpha=1;
-  const J=wstate.joints;
-  // bones
+  const J=wstate.joints; const byName={}; J.forEach(j=>byName[j.name]=j);
+  // bones: parent->child line for every joint with a parent
   ctx.strokeStyle='rgba(91,140,255,.9)'; ctx.lineWidth=Math.max(2,2*(window.devicePixelRatio||1));
-  for(const [a,b] of BONE_DRAW){ if(!J[a]||!J[b])continue;
-    ctx.beginPath(); ctx.moveTo(r2cX(J[a][0]),r2cY(J[a][1])); ctx.lineTo(r2cX(J[b][0]),r2cY(J[b][1])); ctx.stroke(); }
+  for(const j of J){ if(j.parent==null) continue; const P=byName[j.parent]; if(!P) continue;
+    ctx.beginPath(); ctx.moveTo(r2cX(P.x),r2cY(P.y)); ctx.lineTo(r2cX(j.x),r2cY(j.y)); ctx.stroke(); }
   // joints
   const R=Math.max(6,6*(window.devicePixelRatio||1));
-  for(const name of JOINT_NAMES){ const p=J[name]; if(!p)continue;
-    ctx.beginPath(); ctx.arc(r2cX(p[0]),r2cY(p[1]),R,0,Math.PI*2);
-    ctx.fillStyle = (name===dragJoint)?'#3ad29f':'#ffffff';
+  for(const j of J){
+    ctx.beginPath(); ctx.arc(r2cX(j.x),r2cY(j.y),R,0,Math.PI*2);
+    ctx.fillStyle=(j.name===dragJoint)?'#3ad29f':(j.parent==null?'#ffd23a':'#ffffff');
     ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#15171c'; ctx.stroke();
   }
 }
@@ -1443,9 +1626,9 @@ let dragJoint=null;
 function pickJoint(cx,cy){
   const R=Math.max(10,12*(window.devicePixelRatio||1));
   let best=null,bd=R*R;
-  for(const name of JOINT_NAMES){ const p=wstate.joints[name]; if(!p)continue;
-    const dx=cx-r2cX(p[0]), dy=cy-r2cY(p[1]); const d=dx*dx+dy*dy;
-    if(d<bd){bd=d;best=name;} }
+  for(const j of wstate.joints){
+    const dx=cx-r2cX(j.x), dy=cy-r2cY(j.y); const d=dx*dx+dy*dy;
+    if(d<bd){bd=d;best=j.name;} }
   return best;
 }
 function rigEventXY(e){
@@ -1457,19 +1640,19 @@ function rigEventXY(e){
 wEls.rigCanvas.addEventListener('pointerdown', e=>{
   if(!wstate.rc) return; e.preventDefault();
   const [cx,cy]=rigEventXY(e); dragJoint=pickJoint(cx,cy);
-  if(dragJoint){ wEls.rigCanvas.setPointerCapture(e.pointerId); drawRig(); }
+  if(dragJoint){ try{wEls.rigCanvas.setPointerCapture(e.pointerId);}catch(_){} drawRig(); }
 });
 wEls.rigCanvas.addEventListener('pointermove', e=>{
   if(!dragJoint) return; e.preventDefault();
   const [cx,cy]=rigEventXY(e);
-  wstate.joints[dragJoint]=[c2rX(cx), c2rY(cy)];
-  drawRig();
+  const j=wstate.joints.find(j=>j.name===dragJoint);
+  if(j){ j.x=c2rX(cx); j.y=c2rY(cy); drawRig(); }
 });
 function endDrag(){ if(dragJoint){ dragJoint=null; buildParts(); drawRig(); ensureWalkPreview(); } }
 wEls.rigCanvas.addEventListener('pointerup', endDrag);
 wEls.rigCanvas.addEventListener('pointercancel', endDrag);
 
-/* ---- walk preview loop (requestAnimationFrame) ---- */
+/* ---- preview loop (requestAnimationFrame) ---- */
 let walkRAF=null, walkT0=performance.now();
 function ensureWalkPreview(){
   if(!wstate.parts.length){ wEls.prevCard.style.display='none'; return; }
@@ -1489,31 +1672,48 @@ function loopWalk(){
   ctx.clearRect(0,0,cv.width,cv.height);
   const S=Math.min(cv.width,cv.height);
   const fit=walkFit(S);
-  // center the SxS fit box within the canvas
-  fit.ox += (cv.width-S)/2; fit.oy += (cv.height-S)/2;
+  fit.ox+=(cv.width-S)/2; fit.oy+=(cv.height-S)/2;
+  const m=currentMotion();
+  const baseCyc = m ? (m.frames/Math.max(1,m.fps)) : 1.0;
+  const cyc=baseCyc/Math.max(0.05,wstate.speed);
   const elapsed=(performance.now()-walkT0)/1000;
-  const cyc=1.05/Math.max(0.05,wstate.speed); // seconds per stride
   const t=(elapsed/cyc)%1;
   drawWalkFrame(ctx,t,fit);
 }
 
-/* ---- load a character ---- */
+/* ============================================================
+   Build/replace the rig + motions, then re-skin & preview.
+   ============================================================ */
+function applyRig(joints, motions, opts){
+  opts=opts||{};
+  wstate.joints=joints;
+  wstate.autoJoints=JSON.parse(JSON.stringify(joints));
+  // build parts first so fallback motions can read joint geometry
+  sizeRigCanvas(); buildParts();
+  const clean=normalizeMotions(motions||[]);
+  wstate.motions = (opts.noFallback ? clean : withFallbackMotions(clean));
+  if(!wstate.motions.length) wstate.motions=buildFallbackMotions();
+  if(!wstate.motions.some(m=>m.name===wstate.motionName)) wstate.motionName=wstate.motions[0]?wstate.motions[0].name:null;
+  refreshMotionDropdown();
+  drawRig(); ensureWalkPreview();
+  wEls.bakeBtn.disabled=!wstate.parts.length;
+}
+
+/* ---- load a creature image (sets up a fallback rig + motions) ---- */
 async function wHandleSrc(src,name){
-  wSetStatus('Reading character…');
+  wSetStatus('Reading creature…');
   const img=await loadImage(src);
-  if(name){ wstate.basename = (name.replace(/\.[^.]+$/,'').replace(/[^\w\-]+/g,'_')||'character'); }
+  if(name){ wstate.basename=(name.replace(/\.[^.]+$/,'').replace(/[^\w\-]+/g,'_')||'creature'); }
   wstate.img=img; wstate.imgW=img.width; wstate.imgH=img.height;
   const r=wRasterize(img);
   wstate.rc=r.c; wstate.rctx=r.cx; wstate.rw=r.w; wstate.rh=r.h;
   wstate.rdata=r.data; wstate.mask=r.mask; wstate.bbox=r.bbox;
-  const centers=rowCenters(r.mask,r.w,r.h,r.bbox);
-  wstate.centers=centers;
-  const J=autoPlaceSkeleton(r.bbox,centers);
-  wstate.joints=J; wstate.autoJoints=JSON.parse(JSON.stringify(J));
+  wstate.centers=rowCenters(r.mask,r.w,r.h);
   wEls.srcImg.src=src; wEls.srcPrev.style.display='block';
-  sizeRigCanvas(); buildParts(); drawRig(); ensureWalkPreview();
-  wEls.bakeBtn.disabled=false;
-  wSetStatus('Drag joints to fit, then bake.');
+  wEls.analyzeBtn.disabled=false;
+  // default to a simple fallback rig so the tool is usable before/without AI
+  applyRig(fallbackRig(r.bbox, wstate.centers), []);
+  wSetStatus('Loaded. Analyze with AI, or drag joints + pick a fallback motion.');
 }
 
 wEls.drop.addEventListener('click', ()=> wEls.file.click());
@@ -1524,21 +1724,146 @@ wEls.file.addEventListener('change', e=>{ const fl=e.target.files&&e.target.file
 wEls.drop.addEventListener('drop', e=>{ const fl=e.dataTransfer.files&&e.dataTransfer.files[0]; if(!fl)return;
   const rd=new FileReader(); rd.onload=()=>wHandleSrc(rd.result,fl.name); rd.readAsDataURL(fl); });
 
-wEls.resetBtn.addEventListener('click', ()=>{ if(!wstate.autoJoints||!Object.keys(wstate.autoJoints).length)return;
+wEls.resetBtn.addEventListener('click', ()=>{ if(!wstate.autoJoints||!wstate.autoJoints.length)return;
   wstate.joints=JSON.parse(JSON.stringify(wstate.autoJoints)); buildParts(); drawRig(); ensureWalkPreview(); });
 wEls.rebuildBtn.addEventListener('click', ()=>{ buildParts(); drawRig(); ensureWalkPreview(); });
 
-wEls.stride.addEventListener('input', e=>{ wstate.stride=+e.target.value; wEls.strideVal.textContent=(+e.target.value).toFixed(2); });
-wEls.arm.addEventListener('input', e=>{ wstate.armSwing=+e.target.value; wEls.armVal.textContent=(+e.target.value).toFixed(2); });
-wEls.bounce.addEventListener('input', e=>{ wstate.bounce=+e.target.value; wEls.bounceVal.textContent=(+e.target.value).toFixed(2); });
+wEls.motion.addEventListener('change', e=>{ wstate.motionName=e.target.value; walkT0=performance.now(); });
 wEls.speed.addEventListener('input', e=>{ wstate.speed=+e.target.value; wEls.speedVal.textContent=(+e.target.value).toFixed(2); });
+wEls.stride.addEventListener('input', e=>{ wstate.amount=+e.target.value; wEls.strideVal.textContent=(+e.target.value).toFixed(2); });
 wEls.frames.addEventListener('change', e=>{ wstate.frames=+e.target.value; });
 wEls.frameSize.addEventListener('change', e=>{ wstate.frameSize=+e.target.value; });
 
-/* ---- BAKE the walk strip ---- */
+/* ============================================================
+   AI ANALYZE — Gemini / OpenAI vision -> strict JSON rig + motions.
+   Playback stays 100% local; this only authors the rig + tracks.
+   ============================================================ */
+const AI_DEFAULT_MODEL={ gemini:'gemini-2.0-flash', openai:'gpt-4o-mini' };
+const AI_KEY_LS='spriteStudio.aiKey';
+
+// remember-key wiring
+(function initAIKey(){
+  try{
+    const saved=localStorage.getItem(AI_KEY_LS);
+    if(saved){ wEls.key.value=saved; wEls.remember.checked=true; }
+  }catch(_){}
+})();
+wEls.remember.addEventListener('change', ()=>{
+  try{
+    if(wEls.remember.checked) localStorage.setItem(AI_KEY_LS, wEls.key.value||'');
+    else localStorage.removeItem(AI_KEY_LS);
+  }catch(_){}
+});
+wEls.key.addEventListener('input', ()=>{
+  if(wEls.remember.checked){ try{ localStorage.setItem(AI_KEY_LS, wEls.key.value||''); }catch(_){} }
+});
+
+const AI_PROMPT = `You are a 2D character rigger. Look at the image of a single creature on a transparent/empty background and OUTPUT ONLY JSON (no prose, no markdown).
+Identify the body plan (human, bird, rabbit, fish, snake, insect, etc.) and author a bone graph + keyframed motions that suit THAT body plan. The SAME action differs per body plan (a bird "walk" uses legs; a "flap" rotates wings; a snake "slither" waves the body) — choose motions and joints that make sense for what you see.
+Return EXACTLY this schema:
+{
+  "creature": "string",
+  "view": "front|side|three_quarter|top",
+  "joints": [ {"name":"head","x":0.5,"y":0.12,"parent":null}, ... ],
+  "motions": [
+    { "name":"walk", "frames":12, "fps":12, "loop":true,
+      "tracks":[ {"joint":"legL","keys":[{"t":0,"deg":0},{"t":0.5,"deg":25},{"t":1,"deg":0}]} ] }
+  ]
+}
+Rules:
+- joint x,y are NORMALIZED 0..1 over the image (x=0 left, y=0 top). Place each joint on the actual body part you see.
+- Exactly ONE root joint has "parent": null (usually the body/torso center). Every other joint references an existing joint name as parent. No cycles.
+- "deg" is a rotation delta in degrees applied at that joint (rotating a joint moves it AND everything below it in the hierarchy). Keys cover t=0..1; loops should return near the start value.
+- Provide 1-3 motions appropriate to the creature (e.g. walk + idle, or flap + glide, or slither). Keep amplitudes natural (usually |deg| <= 45).
+- Output JSON only.`;
+
+function dataURItoBase64(uri){ const i=uri.indexOf(','); return i>=0?uri.slice(i+1):uri; }
+function dataURImime(uri){ const m=/^data:([^;,]+)/.exec(uri); return m?m[1]:'image/png'; }
+
+function extractJSON(text){
+  if(typeof text!=='string') throw new Error('no text from AI');
+  // strip ```json fences if present, then grab the first {...} block
+  let s=text.replace(/```(?:json)?/gi,'').trim();
+  const a=s.indexOf('{'), b=s.lastIndexOf('}');
+  if(a<0||b<0||b<a) throw new Error('no JSON object in AI response');
+  return JSON.parse(s.slice(a,b+1));
+}
+
+async function callGemini(dataURI, model, key){
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  const body={
+    contents:[{ parts:[
+      { inline_data:{ mime_type:dataURImime(dataURI), data:dataURItoBase64(dataURI) } },
+      { text:AI_PROMPT }
+    ]}],
+    generationConfig:{ responseMimeType:'application/json', temperature:0.4 }
+  };
+  const r=await fetch(url,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  if(!r.ok){ const tx=await r.text().catch(()=> ''); throw new Error('Gemini HTTP '+r.status+' '+tx.slice(0,180)); }
+  const j=await r.json();
+  const text=j?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+  return extractJSON(text);
+}
+
+async function callOpenAI(dataURI, model, key){
+  const url='https://api.openai.com/v1/chat/completions';
+  const body={
+    model,
+    messages:[{ role:'user', content:[
+      { type:'text', text:AI_PROMPT },
+      { type:'image_url', image_url:{ url:dataURI } }
+    ]}],
+    response_format:{ type:'json_object' },
+    temperature:0.4
+  };
+  const r=await fetch(url,{ method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key }, body:JSON.stringify(body) });
+  if(!r.ok){ const tx=await r.text().catch(()=> ''); throw new Error('OpenAI HTTP '+r.status+' '+tx.slice(0,180)); }
+  const j=await r.json();
+  const text=j?.choices?.[0]?.message?.content||'';
+  return extractJSON(text);
+}
+
+async function analyzeWithAI(){
+  if(!wstate.img){ wSetStatus('Load a creature image first.'); return; }
+  const provider=wEls.provider.value;
+  const key=(wEls.key.value||'').trim();
+  if(!key){ wSetStatus('Enter your '+provider+' API key first.'); return; }
+  const model=(wEls.model.value||'').trim() || AI_DEFAULT_MODEL[provider];
+  // source data URI at modest size to keep payload small
+  const srcURI = wEls.srcImg.src && wEls.srcImg.src.startsWith('data:') ? wEls.srcImg.src : null;
+  let dataURI=srcURI;
+  if(!dataURI && wstate.rc){ dataURI=wstate.rc.toDataURL('image/png'); }
+  if(!dataURI){ wSetStatus('No image data to send.'); return; }
+  wEls.analyzeBtn.disabled=true; wSetStatus('Asking '+provider+' ('+model+')…');
+  try{
+    const json = provider==='openai' ? await callOpenAI(dataURI,model,key) : await callGemini(dataURI,model,key);
+    const joints=normalizeRigJSON(json, wstate.rw, wstate.rh);
+    const motions=normalizeMotions(json.motions||[]);
+    wstate.creature=String(json.creature||'');
+    applyRig(joints, motions);  // fallbacks appended automatically
+    const mList=wstate.motions.map(m=>m.name).join(', ');
+    wSetStatus('AI rig: '+(wstate.creature||'creature')+' · '+joints.length+' joints · motions: '+mList);
+  }catch(err){
+    console.error(err);
+    const msg=String(err&&err.message||err);
+    const corsLike = msg==='Failed to fetch' || /NetworkError|Load failed|CORS/i.test(msg);
+    if(corsLike && location.protocol==='file:'){
+      wSetStatus('AI call blocked from file:// — open the hosted https link, or run a local server. (Rig still editable manually.)');
+    } else if(corsLike){
+      wSetStatus('AI call failed (network/CORS). Check key & connection. Rig still editable manually.');
+    } else {
+      wSetStatus('AI error: '+msg.slice(0,160)+'  — rig still editable manually.');
+    }
+  }finally{
+    wEls.analyzeBtn.disabled=false;
+  }
+}
+wEls.analyzeBtn.addEventListener('click', analyzeWithAI);
+
+/* ---- BAKE the motion strip ---- */
 function bakeWalk(){
   return new Promise((resolve,reject)=>{
-    if(!wstate.parts.length){ reject(new Error('no character rigged')); return; }
+    if(!wstate.parts.length){ reject(new Error('no creature rigged')); return; }
     const N=wstate.frames, fs=wstate.frameSize;
     const strip=document.createElement('canvas'); strip.width=N*fs; strip.height=fs;
     const sctx=strip.getContext('2d');
@@ -1556,7 +1881,7 @@ function bakeWalk(){
   });
 }
 
-/* walk flipbook */
+/* motion flipbook */
 let wFlipFrames=[], wFlipIdx=0, wFlipTimer=null;
 function startWalkFlip(stripCanvas,N,fs){
   if(wFlipTimer) clearInterval(wFlipTimer);
@@ -1569,20 +1894,22 @@ function startWalkFlip(stripCanvas,N,fs){
     wFlipIdx=(wFlipIdx+1)%wFlipFrames.length; }, 1000/12);
 }
 
+function motionSlug(){ return (wstate.motionName||'motion').replace(/[^\w\-]+/g,'_'); }
+
 let wLastBake=null;
 wEls.bakeBtn.addEventListener('click', async ()=>{
   wEls.bakeBtn.disabled=true; wSetStatus('Baking '+wstate.frames+' frames…');
   try{
     const res=await bakeWalk(); wLastBake=res;
     wEls.stripImg.src=res.dataURL; wEls.bakeOut.style.display='block'; wEls.emptyCard.style.display='none';
-    wEls.caption.textContent=`Sheet: ${res.w} × ${res.h}px  (${res.frames} frames × ${wstate.frameSize}px, walk cycle)`;
+    wEls.caption.textContent=`Sheet: ${res.w} × ${res.h}px  (${res.frames} frames × ${wstate.frameSize}px, motion: ${wstate.motionName||'—'})`;
     startWalkFlip(res.canvas,res.frames,wstate.frameSize);
     wSetStatus('Baked. Download ready.');
   }catch(err){ wSetStatus('Bake failed: '+err.message); console.error(err); }
   finally{ wEls.bakeBtn.disabled=false; }
 });
 wEls.dlBtn.addEventListener('click', ()=>{ if(!wLastBake)return;
-  const a=document.createElement('a'); a.href=wLastBake.dataURL; a.download=`${wstate.basename}_walk.png`; a.click(); });
+  const a=document.createElement('a'); a.href=wLastBake.dataURL; a.download=`${wstate.basename}_${motionSlug()}.png`; a.click(); });
 
 /* ============================================================
    MODE SWITCHING (Spin <-> Walk)
@@ -1601,7 +1928,7 @@ function setFunction(fn){
   spinStage.classList.toggle('hidden',!isSpin); walkStage.classList.toggle('hidden',isSpin);
   subText.innerHTML = isSpin
     ? 'Spin: top-view PNG &rarr; faux-3D rotation sheet'
-    : 'Walk: humanoid PNG &rarr; auto-rigged walk-cycle sheet';
+    : 'Animate: any creature PNG &rarr; AI-rigged keyframed motion sheet';
   if(isSpin){ sizeLiveRenderer(); }
   else { sizeRigCanvas(); sizePrevCanvas(); if(wstate.rc){ drawRig(); ensureWalkPreview(); } }
 }
@@ -1658,7 +1985,7 @@ window.__tool = {
     return true;
   },
   setMode(m){
-    if (!['slice','patty','smooth','sphere'].includes(m)) throw new Error('bad mode '+m);
+    if (!['slice','patty','smooth','sphere','cube'].includes(m)) throw new Error('bad mode '+m);
     state.mode = m; els.mode.value = m; buildMesh();
   },
   setParam(key, val){
@@ -1679,41 +2006,67 @@ window.__tool = {
   _state: state,
 };
 
+/* Read the source image into the working raster (shared by load + injectRig). */
+async function _animateIngest(url, name){
+  const img=await loadImage(url);
+  wstate.basename = name ? (name.replace(/\.[^.]+$/,'').replace(/[^\w\-]+/g,'_')||'creature') : 'test';
+  wstate.img=img; wstate.imgW=img.width; wstate.imgH=img.height;
+  const r=wRasterize(img);
+  wstate.rc=r.c; wstate.rctx=r.cx; wstate.rw=r.w; wstate.rh=r.h;
+  wstate.rdata=r.data; wstate.mask=r.mask; wstate.bbox=r.bbox;
+  wstate.centers=rowCenters(r.mask,r.w,r.h);
+  wEls.srcImg.src=url; wEls.srcPrev.style.display='block';
+  wEls.analyzeBtn.disabled=false;
+  return r;
+}
+
+const animateAPI = {
+  /* load an image and seed the default fallback rig + motions */
+  async loadFromDataURL(url){
+    await _animateIngest(url);
+    applyRig(fallbackRig(wstate.bbox, wstate.centers), []);
+    return true;
+  },
+  /* BYPASS the API: feed a hand-written rig+motions JSON.
+     If no image is loaded yet, you can pass {image:dataURI} in json. */
+  async injectRig(json){
+    if(json && json.image && !wstate.rc){ await _animateIngest(json.image); }
+    if(!wstate.rw){ throw new Error('injectRig: load an image first (or pass json.image)'); }
+    const joints=normalizeRigJSON(json, wstate.rw, wstate.rh);
+    const motions=normalizeMotions(json.motions||[]);
+    wstate.creature=String(json.creature||'');
+    applyRig(joints, motions);     // built-in fallbacks appended
+    return { joints:joints.length, motions:wstate.motions.map(m=>m.name) };
+  },
+  listMotions(){ return wstate.motions.map(m=>m.name); },
+  setMotion(name){
+    if(!wstate.motions.some(m=>m.name===name)) throw new Error('no such motion: '+name);
+    wstate.motionName=name; if(wEls.motion) wEls.motion.value=name; walkT0=performance.now(); return true;
+  },
+  getMotion(){ return wstate.motionName; },
+  /* manual rig adjust */
+  getJoints(){ return wstate.joints.map(j=>({name:j.name,x:j.x,y:j.y,parent:j.parent})); },
+  setJoint(name,x,y){ const j=wstate.joints.find(j=>j.name===name); if(!j) throw new Error('no joint '+name);
+    j.x=+x; j.y=+y; return true; },
+  reskin(){ buildParts(); drawRig(); ensureWalkPreview(); return wstate.parts.length; },
+  setParam(key,val){
+    switch(key){
+      case 'speed': wstate.speed=+val; wEls.speed.value=val; wEls.speedVal.textContent=(+val).toFixed(2); break;
+      case 'amount': case 'stride': wstate.amount=+val; wEls.stride.value=val; wEls.strideVal.textContent=(+val).toFixed(2); break;
+      case 'frames': wstate.frames=+val; wEls.frames.value=String(val); break;
+      case 'frameSize': wstate.frameSize=+val; wEls.frameSize.value=String(val); break;
+      default: throw new Error('bad param '+key);
+    }
+  },
+  async bake(){ const r=await bakeWalk(); return { dataURL:r.dataURL, frames:r.frames, w:r.w, h:r.h }; },
+  _state: wstate,
+};
+
 window.__studio = {
   setFunction(fn){ setFunction(fn); },
   spin: window.__tool,
-  walk: {
-    async loadFromDataURL(url){
-      const img=await loadImage(url);
-      wstate.basename='test';
-      wstate.img=img; wstate.imgW=img.width; wstate.imgH=img.height;
-      const r=wRasterize(img);
-      wstate.rc=r.c; wstate.rctx=r.cx; wstate.rw=r.w; wstate.rh=r.h;
-      wstate.rdata=r.data; wstate.mask=r.mask; wstate.bbox=r.bbox;
-      const centers=rowCenters(r.mask,r.w,r.h,r.bbox);
-      wstate.centers=centers;
-      const J=autoPlaceSkeleton(r.bbox,centers);
-      wstate.joints=J; wstate.autoJoints=JSON.parse(JSON.stringify(J));
-      wEls.srcImg.src=url; wEls.srcPrev.style.display='block';
-      sizeRigCanvas(); buildParts(); drawRig(); ensureWalkPreview();
-      wEls.bakeBtn.disabled=false;
-      return true;
-    },
-    getJoints(){ const o={}; for(const k in wstate.joints) o[k]=wstate.joints[k].slice(); return o; },
-    setParam(key,val){
-      switch(key){
-        case 'stride': wstate.stride=+val; wEls.stride.value=val; wEls.strideVal.textContent=(+val).toFixed(2); break;
-        case 'armSwing': wstate.armSwing=+val; wEls.arm.value=val; wEls.armVal.textContent=(+val).toFixed(2); break;
-        case 'bounce': wstate.bounce=+val; wEls.bounce.value=val; wEls.bounceVal.textContent=(+val).toFixed(2); break;
-        case 'speed': wstate.speed=+val; wEls.speed.value=val; wEls.speedVal.textContent=(+val).toFixed(2); break;
-        case 'frames': wstate.frames=+val; wEls.frames.value=String(val); break;
-        case 'frameSize': wstate.frameSize=+val; wEls.frameSize.value=String(val); break;
-        default: throw new Error('bad param '+key);
-      }
-    },
-    async bake(){ const r=await bakeWalk(); return { dataURL:r.dataURL, frames:r.frames, w:r.w, h:r.h }; },
-    _state: wstate,
-  },
+  animate: animateAPI,
+  walk: animateAPI,   // back-compat alias
 };
 window.__toolReady = true;
 window.__studioReady = true;
