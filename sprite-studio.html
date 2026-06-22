@@ -146,9 +146,19 @@
   .stat-busy{ color:var(--accent) !important; }
   .stat-pulse{ animation:statPulse .5s ease-out; }
   @keyframes statPulse{ 0%{ filter:brightness(1.9); } 100%{ filter:brightness(1); } }
+  /* top-center toast: makes "started / can't proceed / done" unmistakable */
+  #topToast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-24px);z-index:99999;
+    background:#23262f;color:#fff;padding:13px 26px;border-radius:14px;font-weight:700;font-size:15px;
+    box-shadow:0 12px 34px rgba(0,0,0,.5);opacity:0;pointer-events:none;max-width:84vw;text-align:center;
+    transition:opacity .22s,transform .22s;border:1px solid #3a3f4b;white-space:pre-line;}
+  #topToast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #topToast.toast-ok{background:#1f6f50;border-color:#2fae7e;}
+  #topToast.toast-bad{background:#7a2330;border-color:#e0566a;}
+  #topToast.toast-busy{background:#244a7a;border-color:#5b8cff;}
 </style>
 </head>
 <body>
+<div id="topToast"></div>
 <header>
   <h1>스프라이트 스튜디오</h1>
   <span class="sub" id="subText">입체 회전: 위에서 본 PNG 한 장 &rarr; 입체처럼 도는 회전 시트</span>
@@ -267,7 +277,7 @@
           <span style="font-size:12px;color:var(--muted)">이 브라우저에 키 기억하기 (localStorage)</span>
         </label>
         <label class="row" style="display:block">
-          <div class="lab"><span>모델 (선택 사항)</span></div>
+          <div class="lab"><span>인식(분석) 모델 — 보통 그대로 두세요</span></div>
           <input type="text" id="aiModel" placeholder="gemini-2.0-flash / gpt-4o-mini" autocomplete="off" />
         </label>
         <button class="ghost" id="aiAnalyzeBtn" style="width:100%;margin-top:4px" disabled>🤖 AI로 분석하기</button>
@@ -1704,6 +1714,14 @@ const wEls = {
   reconStatus: document.getElementById('wReconStatus'),
 };
 function wSetStatus(t){ wEls.status.classList.remove('stat-ok','stat-bad','stat-busy','stat-pulse'); wEls.status.textContent=t; }
+/* top-center toast — kind: 'ok' | 'bad' | 'busy' | ''. busy stays until replaced; others auto-hide. */
+function showToast(msg, kind){
+  const t=document.getElementById('topToast'); if(!t) return;
+  t.textContent=msg;
+  t.className='show'+(kind?(' toast-'+kind):'');
+  clearTimeout(t._tmr);
+  if(kind!=='busy') t._tmr=setTimeout(()=>{ t.classList.remove('show'); }, 3400);
+}
 /* prominent staged status: kind = 'ok' | 'bad' | 'busy' | '' */
 function wSetStatusState(t, kind){
   const el=wEls.status;
@@ -2172,17 +2190,18 @@ function wSetReconStatus(t){ if(wEls.reconStatus) wEls.reconStatus.innerHTML=t; 
 /* orchestrate: reconstruct every rig part with per-part error tolerance */
 async function reconstructAllParts(){
   if(_reconBusy) return;
-  if(!wstate.parts.length){ wSetReconStatus('먼저 부위를 만드세요 (캐릭터 불러오기 / AI 분석).'); return; }
+  if(!wstate.parts.length){ wSetReconStatus('먼저 부위를 만드세요 (캐릭터 불러오기 / AI 분석).'); showToast('❌ 진행 불가: 먼저 부위를 만드세요','bad'); return; }
   const provider=wEls.provider.value;
   const key=(wEls.key.value||'').trim();
-  if(!key){ wSetReconStatus('API 키를 먼저 입력하세요.'); return; }
+  if(!key){ wSetReconStatus('API 키를 먼저 입력하세요.'); showToast('❌ 진행 불가: API 키를 먼저 입력하세요','bad'); return; }
   const imgModel=(wEls.imgModel.value||'').trim() || AI_IMG_DEFAULT_MODEL[provider];
   // skip 1×1 placeholder parts (empty bones)
   const targets=wstate.parts.filter(p=>p.canvas && p.canvas.width>2 && p.canvas.height>2);
   if(!targets.length){ wSetReconStatus('재구성할 만한 부위가 없어요.'); return; }
   _reconBusy=true; wEls.reconstructBtn.disabled=true;
-  let done=0, failed=0; const fails=[];
+  let done=0, failed=0; const fails=[]; let lastErr='';
   wSetReconStatus(`🪄 ${targets.length}개 부위 재구성 중… (${provider} · ${imgModel} · 이미지 생성 ${targets.length}회 호출)`);
+  showToast('🪄 부위 재구성 시작… ('+targets.length+'회 호출)','busy');
   for(const p of targets){
     const label=p.part.replace(/^b_/,'');
     wSetReconStatus(`🪄 <b>${label}</b> 재구성 중… (${done+failed+1}/${targets.length})`);
@@ -2194,9 +2213,10 @@ async function reconstructAllParts(){
     }catch(err){
       failed++; fails.push(label);
       console.warn('reconstruct failed:', p.part, err);
-      const msg=String(err&&err.message||err);
+      const msg=String(err&&err.message||err); lastErr=msg;
       if(/Failed to fetch|NetworkError|Load failed|CORS/i.test(msg) && location.protocol==='file:'){
         wSetReconStatus('❌ 이미지 생성이 <code>file://</code>(파일 직접 열기)에서 막혔어요 — 배포된 https 링크를 열거나 로컬 서버에서 실행하세요. (잘라낸 부위는 그대로 유지됩니다.)');
+        showToast('❌ 진행 불가: file://에서는 막혀요\nhttps 링크에서 쓰세요','bad');
         _reconBusy=false; wEls.reconstructBtn.disabled=false; return;
       }
     }
@@ -2207,10 +2227,16 @@ async function reconstructAllParts(){
     drawRig(); ensureWalkPreview();
     wEls.revertReconBtn.style.display='block';
   }
-  const note = failed
+  let note = failed
     ? ` 성공 ${done}개, 실패 ${failed}개 (${fails.join(', ')}) — 실패한 부위는 잘라낸 그대로 유지됩니다.`
     : ` 전체 ${done}개 부위를 재구성하고 관절에 다시 붙였어요.`;
+  if(failed && lastErr){
+    if(/HTTP\s*(401|403)|incorrect api key|invalid api key|unauthor/i.test(lastErr)) note += ' ⚠️ API 키를 확인하세요.';
+    else if(/HTTP\s*(400|404)|model|not found|does not exist/i.test(lastErr)) note += ' ⚠️ 이미지 생성 모델 이름을 확인하세요 (기본: gpt-image-1). 상세: '+lastErr.slice(0,120);
+    else note += ' 상세: '+lastErr.slice(0,120);
+  }
   wSetReconStatus((done>0?'🪄 완료.':'재구성된 부위가 없어요.')+note);
+  showToast(done>0 ? ('✅ 부위 재구성 완료 ('+done+'/'+targets.length+')') : '❌ 부위 재구성 실패 — 상태줄 확인', done>0?'ok':'bad');
   _reconBusy=false; wEls.reconstructBtn.disabled=false;
 }
 
@@ -2223,17 +2249,17 @@ function revertReconstruction(){
 }
 
 async function analyzeWithAI(){
-  if(!wstate.img){ wSetStatusState('먼저 캐릭터 이미지를 불러오세요.', 'bad'); return; }
+  if(!wstate.img){ wSetStatusState('먼저 캐릭터 이미지를 불러오세요.', 'bad'); showToast('❌ 진행 불가: 캐릭터 이미지를 먼저 불러오세요','bad'); return; }
   const provider=wEls.provider.value;
   const key=(wEls.key.value||'').trim();
-  if(!key){ wSetStatusState('API 키를 먼저 입력하세요.', 'bad'); return; }
+  if(!key){ wSetStatusState('API 키를 먼저 입력하세요.', 'bad'); showToast('❌ 진행 불가: API 키를 먼저 입력하세요','bad'); return; }
   const model=(wEls.model.value||'').trim() || AI_DEFAULT_MODEL[provider];
   // source data URI at modest size to keep payload small
   const srcURI = wEls.srcImg.src && wEls.srcImg.src.startsWith('data:') ? wEls.srcImg.src : null;
   let dataURI=srcURI;
   if(!dataURI && wstate.rc){ dataURI=wstate.rc.toDataURL('image/png'); }
-  if(!dataURI){ wSetStatusState('보낼 이미지 데이터가 없어요.', 'bad'); return; }
-  wEls.analyzeBtn.disabled=true; wSetStatusState('🔍 이미지 분석 중… ('+provider+')', 'busy');
+  if(!dataURI){ wSetStatusState('보낼 이미지 데이터가 없어요.', 'bad'); showToast('❌ 진행 불가: 보낼 이미지가 없어요','bad'); return; }
+  wEls.analyzeBtn.disabled=true; wSetStatusState('🔍 이미지 분석 중… ('+provider+')', 'busy'); showToast('🔍 AI 분석을 시작했어요…','busy');
   try{
     const json = provider==='openai' ? await callOpenAI(dataURI,model,key) : await callGemini(dataURI,model,key);
     const joints=normalizeRigJSON(json, wstate.rw, wstate.rh);
@@ -2242,22 +2268,29 @@ async function analyzeWithAI(){
     applyRig(joints, motions);  // fallbacks appended automatically
     const cname=wstate.creature||'캐릭터';
     wSetStatusState('✅ 인식 완료: '+cname+' · 관절 '+joints.length+'개 · 모션 '+wstate.motions.length+'개', 'ok');
+    showToast('✅ 분석 완료: '+cname,'ok');
   }catch(err){
     console.error(err);
     const msg=String(err&&err.message||err);
     const corsLike = msg==='Failed to fetch' || /NetworkError|Load failed|CORS/i.test(msg);
-    const keyErr = /HTTP\s*(400|401|403)\b/.test(msg) || /invalid|unauthor|api[_ ]?key|permission/i.test(msg);
+    // ONLY 401/403 (or explicit phrases) = key problem. A 400 is usually a bad model / request, NOT the key.
+    const keyErr = /HTTP\s*(401|403)\b/.test(msg) || /incorrect api key|invalid api key|api key not valid|unauthor|permission denied/i.test(msg);
+    const modelErr = /HTTP\s*(400|404)\b/.test(msg) || /\bmodel\b|not found|does not exist|unsupported/i.test(msg);
+    let toast='❌ 진행 불가';
     if(corsLike && location.protocol==='file:'){
-      wSetStatusState('❌ 네트워크·CORS 오류 — 파일을 직접 열면(file://) 막혀요. 배포된 https 링크에서 시도하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad');
+      wSetStatusState('❌ 네트워크·CORS 오류 — 파일을 직접 열면(file://) 막혀요. 배포된 https 링크에서 시도하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad'); toast='❌ 진행 불가: file://에서는 막혀요\nhttps 링크에서 쓰세요';
     } else if(corsLike){
-      wSetStatusState('❌ 네트워크·CORS 오류 — 키와 연결을 확인하거나 배포된 https 링크에서 시도하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad');
+      wSetStatusState('❌ 네트워크·CORS 오류 — 키와 연결을 확인하거나 배포된 https 링크에서 시도하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad'); toast='❌ 진행 불가: 네트워크·CORS 오류';
     } else if(keyErr){
-      wSetStatusState('❌ API 키가 올바르지 않아요 — 키를 다시 확인하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad');
+      wSetStatusState('❌ API 키가 올바르지 않아요 (인증 거부) — 키를 다시 확인하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad'); toast='❌ 진행 불가: API 키 오류';
+    } else if(modelErr){
+      wSetStatusState('❌ 모델/요청 오류 — 모델 이름을 확인하세요. 인식 모델 기본값: gpt-4o-mini(OpenAI)·gemini-2.0-flash(Gemini). 상세: '+msg.slice(0,150)+' (뼈대는 직접 편집할 수 있어요.)', 'bad'); toast='❌ 진행 불가: 모델 이름을 확인하세요';
     } else if(/no text from AI|no JSON object|JSON|parse|Unexpected/i.test(msg)){
-      wSetStatusState('❌ AI 응답을 해석하지 못했어요 — 다시 시도해 주세요. (뼈대는 직접 편집할 수 있어요.)', 'bad');
+      wSetStatusState('❌ AI 응답을 해석하지 못했어요 — 다시 시도해 주세요. (뼈대는 직접 편집할 수 있어요.)', 'bad'); toast='❌ AI 응답 해석 실패 — 다시 시도';
     } else {
-      wSetStatusState('❌ AI 오류: '+msg.slice(0,140)+' — 뼈대는 직접 편집할 수 있어요.', 'bad');
+      wSetStatusState('❌ AI 오류: '+msg.slice(0,140)+' — 뼈대는 직접 편집할 수 있어요.', 'bad'); toast='❌ AI 오류 — 상태줄 확인';
     }
+    showToast(toast,'bad');
   }finally{
     wEls.analyzeBtn.disabled=false;
   }
@@ -2265,6 +2298,20 @@ async function analyzeWithAI(){
 wEls.analyzeBtn.addEventListener('click', analyzeWithAI);
 wEls.reconstructBtn.addEventListener('click', reconstructAllParts);
 wEls.revertReconBtn.addEventListener('click', revertReconstruction);
+
+/* Pre-fill correct model defaults so users never have to type a model name (and can't
+   leave a wrong one like "gpt image-2"); reset them whenever the provider changes. */
+function applyModelDefaults(){
+  const pv=wEls.provider.value;
+  if(wEls.model) wEls.model.value = AI_DEFAULT_MODEL[pv] || '';
+  if(wEls.imgModel) wEls.imgModel.value = AI_IMG_DEFAULT_MODEL[pv] || '';
+}
+applyModelDefaults();
+wEls.provider.addEventListener('change', ()=>{
+  applyModelDefaults();
+  if(wEls.keyMark){ wEls.keyMark.textContent=''; wEls.keyMark.style.color=''; }
+  if(wEls.keyStatus){ wEls.keyStatus.classList.remove('stat-ok','stat-bad','stat-busy','stat-pulse'); wEls.keyStatus.textContent='제공자를 바꿨어요 — 🔑 키 테스트로 다시 확인하세요.'; }
+});
 
 /* ---- BAKE the motion strip ---- */
 function bakeWalk(){
