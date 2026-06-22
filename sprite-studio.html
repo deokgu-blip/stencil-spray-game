@@ -121,7 +121,7 @@
   .strip-scroll img{display:block; image-rendering:auto; height:128px}
   .flip-row{display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap; margin-top:14px}
   .flip-box{text-align:center}
-  #flipCanvas, #walkFlipCanvas{
+  #flipCanvas, #walkFlipCanvas, #videoFlipCanvas{
     border-radius:10px; width:160px; height:160px;
     background:
       linear-gradient(45deg,#23262f 25%,transparent 25%) 0 0/16px 16px,
@@ -165,6 +165,7 @@
   <div class="modebar">
     <button class="modebtn active" id="btnSpin">&#127744; 입체 회전</button>
     <button class="modebtn" id="btnWalk">&#129302; AI 애니메이션</button>
+    <button class="modebtn" id="btnVideo">&#127916; 영상&rarr;스프라이트</button>
   </div>
 </header>
 
@@ -356,6 +357,72 @@
       <button class="primary" id="wBakeBtn" disabled>모션 시트 굽기</button>
       <div class="hint" id="wStatus">캐릭터를 불러오면 시작합니다.</div>
     </div>
+
+    <!-- ============ VIDEO CONTROLS ============ -->
+    <div class="panel-controls hidden" id="videoControls">
+      <div class="group">
+        <h3>영상 파일</h3>
+        <div class="drop" id="vdrop">
+          <div><b>영상 파일을 끌어다 놓거나 클릭</b></div>
+          <div style="margin-top:4px">mp4 / webm / mov / gif &middot; 이 브라우저 안에서만 처리</div>
+          <input type="file" id="vfile" accept="video/*,.gif" style="display:none" />
+        </div>
+        <div class="src-preview" id="vsrcPrev" style="display:none">
+          <video id="vPreview" muted playsinline preload="auto" style="width:100%;display:block;border-radius:8px;background:#000"></video>
+        </div>
+        <div class="hint" style="margin-top:6px;font-size:11px;line-height:1.5">
+          로컬 파일을 그대로 읽기 때문에(브라우저 내부 URL) 외부 전송·CORS 문제가 없어요.
+          균등한 간격으로 프레임을 뽑아 가로로 이어 붙입니다.</div>
+      </div>
+
+      <div class="group">
+        <h3>굽기 설정</h3>
+        <label class="row">
+          <div class="lab"><span>프레임 수</span></div>
+          <select id="vFrames">
+            <option value="8">8</option>
+            <option value="12">12</option>
+            <option value="16" selected>16</option>
+            <option value="24">24</option>
+            <option value="32">32</option>
+          </select>
+        </label>
+        <label class="row">
+          <div class="lab"><span>프레임 크기 (px)</span></div>
+          <select id="vFrameSize">
+            <option value="128">128</option>
+            <option value="256" selected>256</option>
+            <option value="512">512</option>
+          </select>
+        </label>
+        <label class="row">
+          <div class="lab"><span>맞춤</span></div>
+          <select id="vFit">
+            <option value="contain" selected>여백 맞춤 (contain)</option>
+            <option value="cover">꽉 채움 (cover)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="group">
+        <h3>구간 (영상에서 뽑을 범위)</h3>
+        <label class="row">
+          <div class="lab"><span>시작 %</span><b id="vStartVal">0%</b></div>
+          <input type="range" id="vStart" min="0" max="100" step="1" value="0"/>
+        </label>
+        <label class="row">
+          <div class="lab"><span>끝 %</span><b id="vEndVal">100%</b></div>
+          <input type="range" id="vEnd" min="0" max="100" step="1" value="100"/>
+        </label>
+        <label class="row" style="flex-direction:row; align-items:center; gap:8px; justify-content:flex-start; margin-top:4px">
+          <input type="checkbox" id="vMatte" style="width:auto" />
+          <span style="font-size:12px;color:var(--muted)">단색 배경 제거 (투명화)</span>
+        </label>
+      </div>
+
+      <button class="primary" id="vBakeBtn" disabled>프레임 추출 → 시트 굽기</button>
+      <div class="hint" id="vStatus">영상을 불러오면 시작합니다.</div>
+    </div>
   </aside>
 
   <!-- RIGHT: stage -->
@@ -419,6 +486,35 @@
 
       <div class="card" id="wEmptyCard">
         <div class="empty">아직 구운 모션 시트가 없어요. 캐릭터 PNG를 불러와 AI로 분석(또는 기본 모션 사용)한 뒤 <b>모션 시트 굽기</b>를 누르세요.</div>
+      </div>
+    </div>
+
+    <!-- ============ VIDEO STAGE ============ -->
+    <div class="panel-stage hidden" id="videoStage">
+      <div class="card live-wrap" id="vPrevCard">
+        <h2>영상 미리보기</h2>
+        <video id="vStagePreview" muted playsinline loop preload="auto"
+          style="width:100%;height:380px;border-radius:10px;display:block;background:#191b21;object-fit:contain"></video>
+        <div class="hint">불러온 영상입니다. 자동으로 반복 재생돼요. 왼쪽에서 프레임 수·크기·맞춤·구간을 정한 뒤 <b>프레임 추출 → 시트 굽기</b>를 누르세요.</div>
+      </div>
+
+      <div class="card bake-out" id="vBakeOut">
+        <h2>완성된 스프라이트 시트</h2>
+        <div class="strip-scroll"><img id="vStripImg" alt="영상 스프라이트 시트"/></div>
+        <div class="flip-row">
+          <div class="flip-box">
+            <canvas id="videoFlipCanvas" width="160" height="160"></canvas>
+            <div class="cap">플립북 미리보기</div>
+          </div>
+          <div class="toolbar">
+            <button class="ghost" id="vDlBtn">PNG 내려받기</button>
+          </div>
+        </div>
+        <div class="caption" id="vCaption"></div>
+      </div>
+
+      <div class="card" id="vEmptyCard">
+        <div class="empty">아직 구운 시트가 없어요. 영상 파일을 불러와 설정을 정한 뒤 <b>프레임 추출 → 시트 굽기</b>를 누르세요.</div>
       </div>
     </div>
   </main>
@@ -2155,20 +2251,34 @@ async function openaiReconstructPart(squareCanvas, prompt, model, key){
     throw err;
   }
 }
-// flood-fill the near-uniform border colour to alpha 0 (fallback when the model can't do transparency)
-async function matteToTransparent(url){
-  const img=await loadImage(url);
-  const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
-  const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(img,0,0);
-  const w=c.width,h=c.height,id=x.getImageData(0,0,w,h),d=id.data,bg=[d[0],d[1],d[2]];
-  const close=i=>{ const a=d[i*4]-bg[0],b=d[i*4+1]-bg[1],e=d[i*4+2]-bg[2]; return a*a+b*b+e*e<1800; };
+/* SHARED matte helper — flood-fill the near-uniform corner/border colour to
+   alpha 0, starting from the 4 corners (so only background connected to the
+   edge is removed; interior subject pixels of a matching colour are kept).
+   Operates IN PLACE on a 2D context. `dist2` = squared colour-distance
+   threshold (default 1800 ≈ ~42/channel). Used by both the AI-reconstruct
+   fallback (matteToTransparent) and the video frame extractor. */
+function matteCanvasInPlace(ctx, w, h, dist2){
+  dist2 = (dist2==null) ? 1800 : dist2;
+  const id=ctx.getImageData(0,0,w,h), d=id.data;
+  // background key = average of the 4 corner pixels (robust to a single noisy corner)
+  const corner=i=>[d[i*4],d[i*4+1],d[i*4+2]];
+  const c0=corner(0), c1=corner(w-1), c2=corner((h-1)*w), c3=corner(h*w-1);
+  const bg=[(c0[0]+c1[0]+c2[0]+c3[0])/4,(c0[1]+c1[1]+c2[1]+c3[1])/4,(c0[2]+c1[2]+c2[2]+c3[2])/4];
+  const close=i=>{ const a=d[i*4]-bg[0],b=d[i*4+1]-bg[1],e=d[i*4+2]-bg[2]; return a*a+b*b+e*e<dist2; };
   const seen=new Uint8Array(w*h),st=[];
   const push=(px,py)=>{ if(px<0||py<0||px>=w||py>=h)return; const i=py*w+px; if(seen[i]||!close(i))return; seen[i]=1; st.push(i); };
   for(let px=0;px<w;px++){ push(px,0); push(px,h-1); }
   for(let py=0;py<h;py++){ push(0,py); push(w-1,py); }
   while(st.length){ const i=st.pop(),px=i%w,py=(i/w)|0; push(px+1,py);push(px-1,py);push(px,py+1);push(px,py-1); }
   for(let i=0;i<w*h;i++){ if(seen[i]) d[i*4+3]=0; }
-  x.putImageData(id,0,0);
+  ctx.putImageData(id,0,0);
+}
+// flood-fill the near-uniform border colour to alpha 0 (fallback when the model can't do transparency)
+async function matteToTransparent(url){
+  const img=await loadImage(url);
+  const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
+  const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(img,0,0);
+  matteCanvasInPlace(x, c.width, c.height, 1800);
   return c.toDataURL('image/png');
 }
 
@@ -2400,32 +2510,271 @@ wEls.dlBtn.addEventListener('click', ()=>{ if(!wLastBake)return;
   const a=document.createElement('a'); a.href=wLastBake.dataURL; a.download=`${wstate.basename}_${motionSlug()}.png`; a.click(); });
 
 /* ============================================================
-   MODE SWITCHING (Spin <-> Walk)
+   FUNCTION (C) — VIDEO -> SPRITE SHEET
+   Extract N evenly-spaced frames from a LOCALLY-uploaded video file
+   (object URL -> no CORS, no canvas tainting) and stitch them into a
+   horizontal sprite-sheet PNG. Pure browser, no CDN, no upload.
+   Pipeline: file -> URL.createObjectURL -> <video> (muted, playsinline)
+             -> loadedmetadata (duration) -> for each i: seek to t,
+                await 'seeked', drawImage with chosen fit (contain/cover),
+                optional matte -> stitch at x=i*frameSize -> strip PNG.
+   ============================================================ */
+const vstate = {
+  url: null,         // current object URL (revoked when replaced)
+  basename: 'video',
+  frames: 16,
+  frameSize: 256,
+  fit: 'contain',
+  startPct: 0,
+  endPct: 100,
+  matte: false,
+  ready: false,      // metadata loaded + duration > 0
+  fps: 12,           // implied fps of the baked strip (for flipbook timing)
+};
+const vEls = {
+  drop: document.getElementById('vdrop'),
+  file: document.getElementById('vfile'),
+  srcPrev: document.getElementById('vsrcPrev'),
+  preview: document.getElementById('vPreview'),
+  stagePreview: document.getElementById('vStagePreview'),
+  frames: document.getElementById('vFrames'),
+  frameSize: document.getElementById('vFrameSize'),
+  fit: document.getElementById('vFit'),
+  start: document.getElementById('vStart'),
+  end: document.getElementById('vEnd'),
+  startVal: document.getElementById('vStartVal'),
+  endVal: document.getElementById('vEndVal'),
+  matte: document.getElementById('vMatte'),
+  bakeBtn: document.getElementById('vBakeBtn'),
+  status: document.getElementById('vStatus'),
+  bakeOut: document.getElementById('vBakeOut'),
+  emptyCard: document.getElementById('vEmptyCard'),
+  stripImg: document.getElementById('vStripImg'),
+  flipCanvas: document.getElementById('videoFlipCanvas'),
+  caption: document.getElementById('vCaption'),
+  dlBtn: document.getElementById('vDlBtn'),
+};
+function vSetStatus(t){ vEls.status.textContent = t; }
+
+/* The hidden <video> we actually seek + draw from. Kept separate from the
+   stage <video> preview so seeking for extraction never disturbs playback. */
+const vGrab = document.createElement('video');
+vGrab.muted = true; vGrab.playsInline = true; vGrab.preload = 'auto';
+vGrab.setAttribute('muted',''); vGrab.setAttribute('playsinline','');
+vGrab.crossOrigin = 'anonymous';
+
+/* Load a video from an object/blob/data URL into the preview + grab videos.
+   Resolves once metadata (duration) is known. */
+function vLoadURL(url, name){
+  return new Promise((resolve, reject)=>{
+    if(name){ vstate.basename = name.replace(/\.[^.]+$/,'').replace(/[^\w\-]+/g,'_') || 'video'; }
+    // revoke any previous object URL we created
+    if(vstate.url && vstate.url.startsWith('blob:') && vstate.url!==url){ try{ URL.revokeObjectURL(vstate.url); }catch(_){} }
+    vstate.url = url; vstate.ready = false;
+    let settled = false;
+    const onMeta = ()=>{
+      if(settled) return; settled = true;
+      cleanup();
+      const dur = vGrab.duration;
+      if(!isFinite(dur) || dur<=0 || isNaN(dur)){
+        vstate.ready = false;
+        reject(new Error('영상 길이를 알 수 없어요 (duration=0 / 디코드 실패)'));
+        return;
+      }
+      vstate.ready = true;
+      // show previews
+      vEls.preview.src = url; vEls.srcPrev.style.display='block';
+      vEls.stagePreview.src = url;
+      try{ vEls.stagePreview.play().catch(()=>{}); }catch(_){}
+      vEls.bakeBtn.disabled = false;
+      resolve({ duration: dur, w: vGrab.videoWidth, h: vGrab.videoHeight });
+    };
+    const onErr = ()=>{
+      if(settled) return; settled = true; cleanup();
+      vstate.ready = false;
+      reject(new Error('영상을 읽지 못했어요 (지원하지 않는 코덱일 수 있어요)'));
+    };
+    const cleanup = ()=>{ vGrab.removeEventListener('loadedmetadata', onMeta); vGrab.removeEventListener('error', onErr); };
+    vGrab.addEventListener('loadedmetadata', onMeta);
+    vGrab.addEventListener('error', onErr);
+    vGrab.src = url;
+    try{ vGrab.load(); }catch(_){}
+  });
+}
+
+/* Seek the grab video to time t (seconds) and wait until the frame is ready.
+   Some browsers/codecs need a tiny play()/pause() nudge before seeking fires;
+   we do that on first use. Falls back on a timeout so a stubborn seek can't
+   hang the whole bake (we just draw whatever the current frame is). */
+let _vNudged = false;
+async function vSeekTo(t){
+  if(!_vNudged){
+    _vNudged = true;
+    try{ await vGrab.play(); }catch(_){}
+    try{ vGrab.pause(); }catch(_){}
+  }
+  const dur = vGrab.duration || 0;
+  // clamp slightly inside the bounds — exactly == duration often never fires 'seeked'
+  const target = Math.max(0, Math.min(t, Math.max(0, dur - 0.001)));
+  return new Promise((resolve)=>{
+    let done = false;
+    const finish = ()=>{ if(done) return; done = true; vGrab.removeEventListener('seeked', onSeeked); clearTimeout(tmr); resolve(); };
+    const onSeeked = ()=> finish();
+    const tmr = setTimeout(finish, 1200);  // timeout fallback
+    vGrab.addEventListener('seeked', onSeeked);
+    // if we're already at the target (within a frame), 'seeked' may not fire
+    if(Math.abs(vGrab.currentTime - target) < 1e-3){ setTimeout(finish, 30); return; }
+    try{ vGrab.currentTime = target; }
+    catch(_){ finish(); }
+  });
+}
+
+/* Draw the current video frame into a square frameSize canvas using the chosen
+   fit. contain = letterbox keeping aspect; cover = fill + center-crop. */
+function vDrawFrame(ctx, fs, fit){
+  const vw = vGrab.videoWidth || 1, vh = vGrab.videoHeight || 1;
+  ctx.clearRect(0,0,fs,fs);
+  let scale;
+  if(fit==='cover') scale = Math.max(fs/vw, fs/vh);
+  else scale = Math.min(fs/vw, fs/vh);   // contain
+  const dw = vw*scale, dh = vh*scale;
+  const dx = (fs-dw)/2, dy = (fs-dh)/2;
+  try{ ctx.drawImage(vGrab, 0,0,vw,vh, dx,dy,dw,dh); }catch(e){ /* draw may throw mid-decode; leave frame blank */ }
+}
+
+/* Extract N frames -> stitch into a horizontal strip. */
+async function vExtract(){
+  if(!vstate.ready){ throw new Error('영상을 먼저 올리세요'); }
+  const N = vstate.frames|0, fs = vstate.frameSize|0, fit = vstate.fit;
+  const dur = vGrab.duration;
+  if(!isFinite(dur) || dur<=0){ throw new Error('영상 길이를 알 수 없어요'); }
+  const s = Math.min(vstate.startPct, vstate.endPct)/100;
+  const e = Math.max(vstate.startPct, vstate.endPct)/100;
+  const strip = document.createElement('canvas');
+  strip.width = N*fs; strip.height = fs;
+  const sctx = strip.getContext('2d');
+  const frame = document.createElement('canvas');
+  frame.width = fs; frame.height = fs;
+  const fctx = frame.getContext('2d', { willReadFrequently:true });
+
+  for(let i=0;i<N;i++){
+    showToast(`🎬 프레임 추출 중… (${i+1}/${N})`,'busy');
+    // even spacing between start and end of the chosen range
+    const frac = (N>1) ? (i/(N-1)) : 0;
+    const t = (s + (e-s)*frac) * dur;
+    await vSeekTo(t);
+    vDrawFrame(fctx, fs, fit);
+    if(vstate.matte){ matteCanvasInPlace(fctx, fs, fs, 1800); }
+    sctx.drawImage(frame, i*fs, 0);
+  }
+  // implied fps so the flipbook plays at roughly the source rate over the range
+  const span = Math.max(0.001, (e-s)*dur);
+  vstate.fps = Math.max(2, Math.min(30, N/span));
+  const dataURL = strip.toDataURL('image/png');
+  return { dataURL, frames:N, w:strip.width, h:strip.height, canvas:strip };
+}
+
+/* ---- video flipbook preview ---- */
+let vFlipFrames=[], vFlipIdx=0, vFlipTimer=null;
+function startVideoFlip(stripCanvas, N, fs, fps){
+  if(vFlipTimer) clearInterval(vFlipTimer);
+  vFlipFrames=[];
+  for(let f=0;f<N;f++){ const c=document.createElement('canvas'); c.width=fs; c.height=fs;
+    c.getContext('2d').drawImage(stripCanvas, f*fs,0,fs,fs, 0,0,fs,fs); vFlipFrames.push(c); }
+  const fc=vEls.flipCanvas, fx=fc.getContext('2d'); vFlipIdx=0;
+  vFlipTimer=setInterval(()=>{ fx.clearRect(0,0,fc.width,fc.height);
+    fx.drawImage(vFlipFrames[vFlipIdx],0,0,fc.width,fc.height);
+    vFlipIdx=(vFlipIdx+1)%vFlipFrames.length; }, 1000/Math.max(2,fps||12));
+}
+
+/* ---- video UI wiring ---- */
+function vHandleFile(fl){
+  if(!fl){ return; }
+  if(!/^video\//.test(fl.type) && !/\.(mp4|webm|mov|m4v|ogv|gif)$/i.test(fl.name||'')){
+    vSetStatus('영상 파일이 아니에요 (mp4/webm/mov/gif).');
+    showToast('❌ 진행 불가: 영상 파일을 올리세요','bad'); return;
+  }
+  const url = URL.createObjectURL(fl);
+  vSetStatus('영상 읽는 중…');
+  vLoadURL(url, fl.name).then(info=>{
+    vSetStatus(`준비 완료 · ${info.w}×${info.h}px · ${info.duration.toFixed(1)}초. 설정을 정하고 구우세요.`);
+    showToast('✅ 영상 불러오기 완료','ok');
+  }).catch(err=>{
+    vSetStatus('불러오기 실패: '+err.message);
+    showToast('❌ '+err.message,'bad');
+  });
+}
+vEls.drop.addEventListener('click', ()=> vEls.file.click());
+vEls.file.addEventListener('change', e=>{ const fl=e.target.files&&e.target.files[0]; vHandleFile(fl); });
+['dragenter','dragover'].forEach(ev=> vEls.drop.addEventListener(ev,e=>{e.preventDefault();vEls.drop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=> vEls.drop.addEventListener(ev,e=>{e.preventDefault();vEls.drop.classList.remove('hot');}));
+vEls.drop.addEventListener('drop', e=>{ const fl=e.dataTransfer.files&&e.dataTransfer.files[0]; vHandleFile(fl); });
+
+vEls.frames.addEventListener('change', e=>{ vstate.frames=+e.target.value; });
+vEls.frameSize.addEventListener('change', e=>{ vstate.frameSize=+e.target.value; });
+vEls.fit.addEventListener('change', e=>{ vstate.fit=e.target.value; });
+vEls.start.addEventListener('input', e=>{ vstate.startPct=+e.target.value; vEls.startVal.textContent=e.target.value+'%'; });
+vEls.end.addEventListener('input', e=>{ vstate.endPct=+e.target.value; vEls.endVal.textContent=e.target.value+'%'; });
+vEls.matte.addEventListener('change', e=>{ vstate.matte=e.target.checked; });
+
+let vLastBake=null;
+vEls.bakeBtn.addEventListener('click', async ()=>{
+  if(!vstate.ready){ vSetStatus('영상을 먼저 올리세요.'); showToast('❌ 진행 불가: 영상을 먼저 올리세요','bad'); return; }
+  vEls.bakeBtn.disabled = true;
+  vSetStatus(vstate.frames+'프레임 추출 중…');
+  showToast(`🎬 프레임 추출 중… (0/${vstate.frames})`,'busy');
+  try{
+    const res = await vExtract();
+    vLastBake = res;
+    vEls.stripImg.src = res.dataURL;
+    vEls.bakeOut.style.display='block'; vEls.emptyCard.style.display='none';
+    vEls.caption.textContent =
+      `시트: ${res.w} × ${res.h}px  (${res.frames}프레임 × ${vstate.frameSize}px, ` +
+      `맞춤: ${vstate.fit==='cover'?'꽉 채움':'여백 맞춤'}${vstate.matte?', 배경 투명화':''})`;
+    startVideoFlip(res.canvas, res.frames, vstate.frameSize, vstate.fps);
+    vSetStatus('완성! 내려받을 수 있어요.');
+    showToast('✅ 시트 완성 ('+res.frames+'프레임)','ok');
+  }catch(err){
+    console.error(err);
+    vSetStatus('추출 실패: '+err.message);
+    showToast('❌ '+err.message,'bad');
+  }finally{
+    vEls.bakeBtn.disabled = false;
+  }
+});
+vEls.dlBtn.addEventListener('click', ()=>{ if(!vLastBake) return;
+  const a=document.createElement('a'); a.href=vLastBake.dataURL; a.download=`${vstate.basename}_frames.png`; a.click(); });
+
+/* ============================================================
+   MODE SWITCHING (Spin <-> Walk <-> Video)
    ============================================================ */
 let currentFn='spin';
-const btnSpin=document.getElementById('btnSpin'), btnWalk=document.getElementById('btnWalk');
-const spinControls=document.getElementById('spinControls'), walkControls=document.getElementById('walkControls');
-const spinStage=document.getElementById('spinStage'), walkStage=document.getElementById('walkStage');
+const btnSpin=document.getElementById('btnSpin'), btnWalk=document.getElementById('btnWalk'), btnVideo=document.getElementById('btnVideo');
+const spinControls=document.getElementById('spinControls'), walkControls=document.getElementById('walkControls'), videoControls=document.getElementById('videoControls');
+const spinStage=document.getElementById('spinStage'), walkStage=document.getElementById('walkStage'), videoStage=document.getElementById('videoStage');
 const subText=document.getElementById('subText');
 function setFunction(fn){
-  if(fn!=='spin'&&fn!=='walk') throw new Error('bad function '+fn);
+  if(fn!=='spin'&&fn!=='walk'&&fn!=='video') throw new Error('bad function '+fn);
   currentFn=fn;
-  const isSpin=fn==='spin';
-  btnSpin.classList.toggle('active',isSpin); btnWalk.classList.toggle('active',!isSpin);
-  spinControls.classList.toggle('hidden',!isSpin); walkControls.classList.toggle('hidden',isSpin);
-  spinStage.classList.toggle('hidden',!isSpin); walkStage.classList.toggle('hidden',isSpin);
+  const isSpin=fn==='spin', isWalk=fn==='walk', isVideo=fn==='video';
+  btnSpin.classList.toggle('active',isSpin); btnWalk.classList.toggle('active',isWalk); btnVideo.classList.toggle('active',isVideo);
+  spinControls.classList.toggle('hidden',!isSpin); walkControls.classList.toggle('hidden',!isWalk); videoControls.classList.toggle('hidden',!isVideo);
+  spinStage.classList.toggle('hidden',!isSpin); walkStage.classList.toggle('hidden',!isWalk); videoStage.classList.toggle('hidden',!isVideo);
   subText.innerHTML = isSpin
     ? '입체 회전: 위에서 본 PNG 한 장 &rarr; 입체처럼 도는 회전 시트'
-    : 'AI 애니메이션: 아무 캐릭터 PNG &rarr; AI가 뼈대를 잡아 움직이는 모션 시트';
+    : isWalk
+    ? 'AI 애니메이션: 아무 캐릭터 PNG &rarr; AI가 뼈대를 잡아 움직이는 모션 시트'
+    : '영상→스프라이트: 올린 영상에서 프레임을 뽑아 가로 스프라이트 시트로';
   if(isSpin){ sizeLiveRenderer(); }
-  else { sizeRigCanvas(); sizePrevCanvas(); if(wstate.rc){ drawRig(); ensureWalkPreview(); } }
+  else if(isWalk){ sizeRigCanvas(); sizePrevCanvas(); if(wstate.rc){ drawRig(); ensureWalkPreview(); } }
 }
 btnSpin.addEventListener('click', ()=>setFunction('spin'));
 btnWalk.addEventListener('click', ()=>setFunction('walk'));
+btnVideo.addEventListener('click', ()=>setFunction('video'));
 
 /* ---- Paste image from clipboard — routes to whichever function is active ---- */
-function pasteRoute(dataURL){ if(currentFn==='walk') wHandleSrc(dataURL,'pasted'); else handleImageSrc(dataURL,'pasted'); }
-function pasteStatus(msg){ if(currentFn==='walk') wSetStatus(msg); else setStatus(msg); }
+function pasteRoute(dataURL){ if(currentFn==='video') return; if(currentFn==='walk') wHandleSrc(dataURL,'pasted'); else handleImageSrc(dataURL,'pasted'); }
+function pasteStatus(msg){ if(currentFn==='video') vSetStatus(msg); else if(currentFn==='walk') wSetStatus(msg); else setStatus(msg); }
 window.addEventListener('paste', e=>{
   const items = e.clipboardData && e.clipboardData.items; if(!items) return;
   for(const it of items){
@@ -2577,11 +2926,34 @@ const animateAPI = {
   _state: wstate,
 };
 
+/* video -> sprite-sheet test API */
+const videoAPI = {
+  /* load a video from an object/blob URL (preferred — local file, no CORS) */
+  async loadObjectURL(url){ await vLoadURL(url); return true; },
+  /* load from a data: URL (decodable inline video) */
+  async loadFromDataURL(url){ await vLoadURL(url); return true; },
+  setParam(key,val){
+    switch(key){
+      case 'frames': vstate.frames=+val; vEls.frames.value=String(val); break;
+      case 'frameSize': vstate.frameSize=+val; vEls.frameSize.value=String(val); break;
+      case 'fit': if(val!=='contain'&&val!=='cover') throw new Error('bad fit '+val); vstate.fit=val; vEls.fit.value=val; break;
+      case 'startPct': vstate.startPct=+val; vEls.start.value=String(val); vEls.startVal.textContent=val+'%'; break;
+      case 'endPct': vstate.endPct=+val; vEls.end.value=String(val); vEls.endVal.textContent=val+'%'; break;
+      case 'matte': vstate.matte=!!val; vEls.matte.checked=!!val; break;
+      default: throw new Error('bad param '+key);
+    }
+  },
+  async extract(){ const r=await vExtract(); return { dataURL:r.dataURL, frames:r.frames, w:r.w, h:r.h }; },
+  _state: vstate,
+  _grab: vGrab,
+};
+
 window.__studio = {
   setFunction(fn){ setFunction(fn); },
   spin: window.__tool,
   animate: animateAPI,
   walk: animateAPI,   // back-compat alias
+  video: videoAPI,
 };
 window.__toolReady = true;
 window.__studioReady = true;
