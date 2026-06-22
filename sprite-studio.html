@@ -2120,34 +2120,56 @@ function loadImageEl(src){ return loadImage(src); }
    fields: model, image (PNG file), prompt, size, background=transparent, n=1
    Response: { data:[{ b64_json }] }  -> data:image/png;base64,<b64_json>
    Fallback: if edits errors, POST images/generations (JSON) with the prompt. */
-async function openaiReconstructPart(squareCanvas, prompt, model, key){
+// one OpenAI image call (edits, then generations fallback); `transparent` toggles the bg flag.
+async function openaiImageCall(squareCanvas, prompt, model, key, transparent){
   const blob=dataURLtoBlob(squareCanvas.toDataURL('image/png'));
   const fd=new FormData();
-  fd.append('model', model);
-  fd.append('image', blob, 'part.png');
-  fd.append('prompt', prompt);
-  fd.append('size', '1024x1024');
-  fd.append('background', 'transparent');   // request a transparent background
-  fd.append('n', '1');
-  let r=await fetch('https://api.openai.com/v1/images/edits', {
-    method:'POST', headers:{ 'Authorization':'Bearer '+key }, body:fd
-  });
+  fd.append('model', model); fd.append('image', blob, 'part.png'); fd.append('prompt', prompt);
+  fd.append('size', '1024x1024'); if(transparent) fd.append('background', 'transparent'); fd.append('n', '1');
+  let r=await fetch('https://api.openai.com/v1/images/edits', { method:'POST', headers:{ 'Authorization':'Bearer '+key }, body:fd });
+  let tx='';
   if(!r.ok){
-    const tx=await r.text().catch(()=> '');
-    // fall back to generations (no input image) if edits is rejected
+    tx=await r.text().catch(()=> '');
+    const body={ model, prompt, size:'1024x1024', n:1 }; if(transparent) body.background='transparent';
     const g=await fetch('https://api.openai.com/v1/images/generations', {
-      method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key },
-      body:JSON.stringify({ model, prompt, size:'1024x1024', background:'transparent', n:1 })
-    });
-    if(!g.ok){ const gt=await g.text().catch(()=> ''); throw new Error('OpenAI img HTTP '+r.status+'/'+g.status+' '+(tx||gt).slice(0,160)); }
+      method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key }, body:JSON.stringify(body) });
+    if(!g.ok){ const gt=await g.text().catch(()=> ''); const e=new Error('OpenAI img HTTP '+r.status+'/'+g.status+' '+(tx||gt).slice(0,200)); e._body=(tx||gt); throw e; }
     r=g;
   }
   const j=await r.json();
-  const b64=j?.data?.[0]?.b64_json;
-  const url=j?.data?.[0]?.url;
+  const b64=j?.data?.[0]?.b64_json; const url=j?.data?.[0]?.url;
   if(b64) return 'data:image/png;base64,'+b64;
-  if(url) return url;   // some configs return a URL
+  if(url) return url;
   throw new Error('OpenAI img: no image in response');
+}
+async function openaiReconstructPart(squareCanvas, prompt, model, key){
+  try{
+    return await openaiImageCall(squareCanvas, prompt, model, key, true);   // prefer a real transparent bg
+  }catch(err){
+    const m=String((err&&err.message)||err)+' '+((err&&err._body)||'');
+    // some models reject background=transparent -> generate opaque, then matte the bg out locally
+    if(/transparent|background/i.test(m)){
+      const url=await openaiImageCall(squareCanvas, prompt+' Plain flat single-color background.', model, key, false);
+      return await matteToTransparent(url);
+    }
+    throw err;
+  }
+}
+// flood-fill the near-uniform border colour to alpha 0 (fallback when the model can't do transparency)
+async function matteToTransparent(url){
+  const img=await loadImage(url);
+  const c=document.createElement('canvas'); c.width=img.width; c.height=img.height;
+  const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(img,0,0);
+  const w=c.width,h=c.height,id=x.getImageData(0,0,w,h),d=id.data,bg=[d[0],d[1],d[2]];
+  const close=i=>{ const a=d[i*4]-bg[0],b=d[i*4+1]-bg[1],e=d[i*4+2]-bg[2]; return a*a+b*b+e*e<1800; };
+  const seen=new Uint8Array(w*h),st=[];
+  const push=(px,py)=>{ if(px<0||py<0||px>=w||py>=h)return; const i=py*w+px; if(seen[i]||!close(i))return; seen[i]=1; st.push(i); };
+  for(let px=0;px<w;px++){ push(px,0); push(px,h-1); }
+  for(let py=0;py<h;py++){ push(0,py); push(w-1,py); }
+  while(st.length){ const i=st.pop(),px=i%w,py=(i/w)|0; push(px+1,py);push(px-1,py);push(px,py+1);push(px,py-1); }
+  for(let i=0;i<w*h;i++){ if(seen[i]) d[i*4+3]=0; }
+  x.putImageData(id,0,0);
+  return c.toDataURL('image/png');
 }
 
 /* ---- Gemini image generation (:generateContent) — inline image in/out ----
