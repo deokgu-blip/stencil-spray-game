@@ -280,7 +280,7 @@
           <div class="lab"><span>인식(분석) 모델 — 보통 그대로 두세요</span></div>
           <input type="text" id="aiModel" placeholder="gemini-2.0-flash / gpt-4o-mini" autocomplete="off" />
         </label>
-        <button class="ghost" id="aiAnalyzeBtn" style="width:100%;margin-top:4px" disabled>🤖 AI로 분석하기</button>
+        <button class="ghost" id="aiAnalyzeBtn" style="width:100%;margin-top:4px" disabled>🤖 AI로 자동 생성 (분석 + 부위 생성)</button>
         <div class="hint" style="margin-top:6px;font-size:11px;line-height:1.5">
           ⚠️ 키는 브라우저에 그대로 노출됩니다 — 본인 키를 로컬 용도로만 쓰세요.
           AI 호출은 <code>file://</code>(파일 직접 열기)에서는 막힐 수 있어요. 그럴 땐 배포된 https
@@ -1925,7 +1925,7 @@ wEls.frameSize.addEventListener('change', e=>{ wstate.frameSize=+e.target.value;
    AI ANALYZE — Gemini / OpenAI vision -> strict JSON rig + motions.
    Playback stays 100% local; this only authors the rig + tracks.
    ============================================================ */
-const AI_DEFAULT_MODEL={ gemini:'gemini-2.0-flash', openai:'gpt-4o-mini' };
+const AI_DEFAULT_MODEL={ gemini:'gemini-2.0-flash', openai:'gpt-5.5' };
 const AI_KEY_LS='spriteStudio.aiKey';
 
 // remember-key wiring
@@ -2074,7 +2074,7 @@ async function callOpenAI(dataURI, model, key){
    and ask the model to redraw the COMPLETE, isolated part on a transparent
    background, then read back the generated image as a data URL.
    ============================================================ */
-const AI_IMG_DEFAULT_MODEL={ openai:'gpt-image-1', gemini:'gemini-2.0-flash-preview-image-generation' };
+const AI_IMG_DEFAULT_MODEL={ openai:'gpt-image-2', gemini:'gemini-2.0-flash-preview-image-generation' };
 
 /* pad a part's cutout onto a transparent SQUARE canvas (centered) so the
    model has room to "unfold"/extend hidden geometry around it. */
@@ -2271,16 +2271,16 @@ function revertReconstruction(){
 }
 
 async function analyzeWithAI(){
-  if(!wstate.img){ wSetStatusState('먼저 캐릭터 이미지를 불러오세요.', 'bad'); showToast('❌ 진행 불가: 캐릭터 이미지를 먼저 불러오세요','bad'); return; }
+  if(!wstate.img){ wSetStatusState('먼저 캐릭터 이미지를 불러오세요.', 'bad'); showToast('❌ 진행 불가: 캐릭터 이미지를 먼저 불러오세요','bad'); return false; }
   const provider=wEls.provider.value;
   const key=(wEls.key.value||'').trim();
-  if(!key){ wSetStatusState('API 키를 먼저 입력하세요.', 'bad'); showToast('❌ 진행 불가: API 키를 먼저 입력하세요','bad'); return; }
+  if(!key){ wSetStatusState('API 키를 먼저 입력하세요.', 'bad'); showToast('❌ 진행 불가: API 키를 먼저 입력하세요','bad'); return false; }
   const model=((wEls.model.value||'').trim().replace(/\s+/g,'-')) || AI_DEFAULT_MODEL[provider];  // model IDs use hyphens, never spaces — auto-fix "gpt image-2" -> "gpt-image-2"
   // source data URI at modest size to keep payload small
   const srcURI = wEls.srcImg.src && wEls.srcImg.src.startsWith('data:') ? wEls.srcImg.src : null;
   let dataURI=srcURI;
   if(!dataURI && wstate.rc){ dataURI=wstate.rc.toDataURL('image/png'); }
-  if(!dataURI){ wSetStatusState('보낼 이미지 데이터가 없어요.', 'bad'); showToast('❌ 진행 불가: 보낼 이미지가 없어요','bad'); return; }
+  if(!dataURI){ wSetStatusState('보낼 이미지 데이터가 없어요.', 'bad'); showToast('❌ 진행 불가: 보낼 이미지가 없어요','bad'); return false; }
   wEls.analyzeBtn.disabled=true; wSetStatusState('🔍 이미지 분석 중… ('+provider+')', 'busy'); showToast('🔍 AI 분석을 시작했어요…','busy');
   try{
     const json = provider==='openai' ? await callOpenAI(dataURI,model,key) : await callGemini(dataURI,model,key);
@@ -2291,6 +2291,7 @@ async function analyzeWithAI(){
     const cname=wstate.creature||'캐릭터';
     wSetStatusState('✅ 인식 완료: '+cname+' · 관절 '+joints.length+'개 · 모션 '+wstate.motions.length+'개', 'ok');
     showToast('✅ 분석 완료: '+cname,'ok');
+    return true;
   }catch(err){
     console.error(err);
     const msg=String(err&&err.message||err);
@@ -2317,23 +2318,35 @@ async function analyzeWithAI(){
     wEls.analyzeBtn.disabled=false;
   }
 }
-wEls.analyzeBtn.addEventListener('click', analyzeWithAI);
+/* one-click: analyze (rig) -> then auto-reconstruct missing parts, in one go */
+async function analyzeAndReconstruct(){
+  showToast('🤖 AI 자동 생성 시작… (분석 → 부위 생성)','busy');
+  const ok = await analyzeWithAI();
+  if(ok===false) return;                 // analysis failed -> stop (message already shown)
+  await reconstructAllParts();           // auto-fill occluded / missing parts
+}
+wEls.analyzeBtn.addEventListener('click', analyzeAndReconstruct);
 wEls.reconstructBtn.addEventListener('click', reconstructAllParts);
 wEls.revertReconBtn.addEventListener('click', revertReconstruction);
 
-/* Pre-fill correct model defaults so users never have to type a model name (and can't
-   leave a wrong one like "gpt image-2"); reset them whenever the provider changes. */
-function applyModelDefaults(){
-  const pv=wEls.provider.value;
-  if(wEls.model) wEls.model.value = AI_DEFAULT_MODEL[pv] || '';
-  if(wEls.imgModel) wEls.imgModel.value = AI_IMG_DEFAULT_MODEL[pv] || '';
-}
-applyModelDefaults();
+/* Persist the user's AI settings (provider + per-provider model names) locally so a refresh keeps them.
+   Defaults: provider=OpenAI, analysis=gpt-5.5, image=gpt-image-2 (from AI_*_DEFAULT_MODEL). */
+const AI_SET_LS='spriteStudio.aiSettings';
+function aiSettingsLoad(){ try{ return JSON.parse(localStorage.getItem(AI_SET_LS)||'{}')||{}; }catch(_){ return {}; } }
+function aiSettingsSave(){ try{ const s=aiSettingsLoad(); const pv=wEls.provider.value; s.provider=pv;
+  s[pv]={ model:(wEls.model&&wEls.model.value)||'', img:(wEls.imgModel&&wEls.imgModel.value)||'' };
+  localStorage.setItem(AI_SET_LS, JSON.stringify(s)); }catch(_){} }
+function applyProviderModels(){ const pv=wEls.provider.value; const sv=(aiSettingsLoad()[pv])||{};
+  if(wEls.model) wEls.model.value = sv.model || AI_DEFAULT_MODEL[pv] || '';
+  if(wEls.imgModel) wEls.imgModel.value = sv.img || AI_IMG_DEFAULT_MODEL[pv] || ''; }
+(function initAISettings(){ const s=aiSettingsLoad(); if(wEls.provider) wEls.provider.value = s.provider || 'openai'; applyProviderModels(); })();
 wEls.provider.addEventListener('change', ()=>{
-  applyModelDefaults();
+  applyProviderModels(); aiSettingsSave();
   if(wEls.keyMark){ wEls.keyMark.textContent=''; wEls.keyMark.style.color=''; }
   if(wEls.keyStatus){ wEls.keyStatus.classList.remove('stat-ok','stat-bad','stat-busy','stat-pulse'); wEls.keyStatus.textContent='제공자를 바꿨어요 — 🔑 키 테스트로 다시 확인하세요.'; }
 });
+if(wEls.model) wEls.model.addEventListener('input', aiSettingsSave);
+if(wEls.imgModel) wEls.imgModel.addEventListener('input', aiSettingsSave);
 
 /* ---- BAKE the motion strip ---- */
 function bakeWalk(){
