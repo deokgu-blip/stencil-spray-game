@@ -502,7 +502,7 @@ function rasterize(img, maxSide){
   let any = false;
   for (let i=0;i<w*h;i++){
     const a = data[i*4+3];
-    if (a > 24){ mask[i] = 1; any = true; }
+    if (a > 96){ mask[i] = 1; any = true; }   // higher threshold -> mesh edge sits on solid pixels (less anti-aliased fringe -> cleaner rim)
   }
   // If image has NO transparency at all, treat near-corner color as background key.
   if (!any){
@@ -645,7 +645,7 @@ function buildMesh(){
   const thick = Math.max(0.001, state.thickness) * Math.min(bw, bh) * 0.6;
 
   // Decimate grid for perf (mesh resolution), but keep it dense enough.
-  const targetCells = 130; // along longest axis
+  const targetCells = 210; // along longest axis (finer grid -> smoother silhouette rim)
   const step = Math.max(1, Math.round(Math.max(w,h) / targetCells));
   const gw = Math.floor((w-1)/step)+1;
   const gh = Math.floor((h-1)/step)+1;
@@ -698,26 +698,34 @@ function buildMesh(){
   // side-wall skirt -> no ragged "floating" band on thin/round/holed shapes.
   // Slice keeps full height to the edge (visible thick sides via the skirt below).
   const seamless = (state.mode === 'smooth' || state.mode === 'patty');
+  const bound = new Uint8Array(gw*gh);   // seamless silhouette-boundary verts (welded later)
   if (seamless){
     for (let gy=0; gy<gh; gy++){
       for (let gx=0; gx<gw; gx++){
         if (!inMask[gy*gw+gx]) continue;
         const boundary = !inM(gx-1,gy)||!inM(gx+1,gy)||!inM(gx,gy-1)||!inM(gx,gy+1)
                         || gx===0||gy===0||gx===gw-1||gy===gh-1;
-        if (boundary) Hmap[gy*gw+gx] = 0;
+        if (boundary){ Hmap[gy*gw+gx] = 0; bound[gy*gw+gx] = 1; }
       }
     }
   }
 
-  // pass 2: create front & back vertices
+  // pass 2: create vertices. Seamless boundary verts are WELDED (ONE shared vertex at
+  // z=0) so front & back form a true closed manifold -> smooth rim, no z-fighting / notches.
   for (let gy=0; gy<gh; gy++){
     for (let gx=0; gx<gw; gx++){
-      if (!inMask[gy*gw+gx]) continue;
+      const idx = gy*gw+gx;
+      if (!inMask[idx]) continue;
       const [px,py] = worldXY(gx,gy);
       const [u,v] = sampleUV(gx,gy);
-      const z = Hmap[gy*gw+gx] * thick;
-      idxFront[gy*gw+gx] = addV(px,py, z, u,v);
-      idxBack [gy*gw+gx] = addV(px,py,-z, u,v);
+      if (seamless && bound[idx]){
+        const id = addV(px,py, 0, u,v);   // welded edge vertex
+        idxFront[idx] = id; idxBack[idx] = id;
+      } else {
+        const z = Hmap[idx] * thick;
+        idxFront[idx] = addV(px,py, z, u,v);
+        idxBack [idx] = addV(px,py,-z, u,v);
+      }
     }
   }
 
@@ -791,7 +799,7 @@ function buildMesh(){
   const mat = new THREE.MeshStandardMaterial({
     map: state.texture,
     transparent: true,
-    alphaTest: 0.5,
+    alphaTest: 0.35,
     side: THREE.DoubleSide,
     roughness: 0.78,
     metalness: 0.0,
