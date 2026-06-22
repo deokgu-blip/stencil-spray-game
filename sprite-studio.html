@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sprite Studio — Spin &amp; Walk sprite-sheet maker</title>
+<title>스프라이트 스튜디오 — 회전·애니메이션 스프라이트시트 메이커</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%235b8cff'/%3E%3Ccircle cx='16' cy='16' r='8' fill='%23fff'/%3E%3C/svg%3E"/>
 <style>
   :root{
@@ -140,15 +140,21 @@
   .panel-controls.hidden, .panel-stage.hidden{display:none}
   .panel-controls{display:block}
   .panel-stage{display:flex; flex-direction:column; gap:18px}
+  /* status feedback states (success/error) for AI + key-test messages */
+  .stat-ok{ color:var(--accent2) !important; }
+  .stat-bad{ color:#ff5a5a !important; }
+  .stat-busy{ color:var(--accent) !important; }
+  .stat-pulse{ animation:statPulse .5s ease-out; }
+  @keyframes statPulse{ 0%{ filter:brightness(1.9); } 100%{ filter:brightness(1); } }
 </style>
 </head>
 <body>
 <header>
-  <h1>Sprite Studio</h1>
-  <span class="sub" id="subText">Spin: top-view PNG &rarr; faux-3D rotation sheet</span>
+  <h1>스프라이트 스튜디오</h1>
+  <span class="sub" id="subText">입체 회전: 위에서 본 PNG 한 장 &rarr; 입체처럼 도는 회전 시트</span>
   <div class="modebar">
-    <button class="modebtn active" id="btnSpin">&#127744; Spin</button>
-    <button class="modebtn" id="btnWalk">&#129302; Animate</button>
+    <button class="modebtn active" id="btnSpin">&#127744; 입체 회전</button>
+    <button class="modebtn" id="btnWalk">&#129302; AI 애니메이션</button>
   </div>
 </header>
 
@@ -158,42 +164,42 @@
     <!-- ============ SPIN CONTROLS ============ -->
     <div class="panel-controls" id="spinControls">
       <div class="group">
-        <h3>Source image</h3>
+        <h3>원본 이미지</h3>
         <div class="drop" id="drop">
-          <div><b>Drop a PNG here</b></div>
-          <div style="margin-top:4px">or click to choose &middot; top-view, transparent bg</div>
+          <div><b>여기에 PNG를 끌어다 놓으세요</b></div>
+          <div style="margin-top:4px">또는 클릭해서 선택 &middot; 위에서 본 그림, 투명 배경</div>
           <input type="file" id="file" accept="image/png,image/*" style="display:none" />
         </div>
-        <div class="src-preview" id="srcPrev"><img id="srcImg" alt="source"/></div>
-        <button class="ghost" id="pasteBtn" style="margin-top:10px;width:100%">📋 Paste image (or ⌘/Ctrl+V)</button>
+        <div class="src-preview" id="srcPrev"><img id="srcImg" alt="원본"/></div>
+        <button class="ghost" id="pasteBtn" style="margin-top:10px;width:100%">📋 이미지 붙여넣기 (또는 ⌘/Ctrl+V)</button>
       </div>
 
       <div class="group">
-        <h3>Shape</h3>
+        <h3>모양</h3>
         <label class="row">
-          <div class="lab"><span>Mode</span></div>
+          <div class="lab"><span>방식</span></div>
           <select id="mode">
-            <option value="slice">Slice Stack (thick disc)</option>
-            <option value="patty">Round Patty (beveled)</option>
-            <option value="smooth" selected>Smooth / Inflation (pillow)</option>
-            <option value="sphere">Sphere (full ball)</option>
-            <option value="cube">Cube / Box (square &rarr; cube)</option>
+            <option value="slice">슬라이스 쌓기 (두꺼운 원판)</option>
+            <option value="patty">둥근 패티 (가장자리 둥글게)</option>
+            <option value="smooth" selected>부드럽게 / 부풀리기 (베개 모양)</option>
+            <option value="sphere">구 (완전한 공 모양)</option>
+            <option value="cube">큐브 / 박스 (사각형 &rarr; 정육면체)</option>
           </select>
         </label>
         <label class="row">
-          <div class="lab"><span>Thickness</span><b id="thickVal">0.45</b></div>
+          <div class="lab"><span>두께</span><b id="thickVal">0.45</b></div>
           <input type="range" id="thickness" min="0" max="1" step="0.01" value="0.45"/>
         </label>
         <label class="row">
-          <div class="lab"><span>Roundness / Edge</span><b id="roundVal">0.50</b></div>
+          <div class="lab"><span>둥글기 / 모서리</span><b id="roundVal">0.50</b></div>
           <input type="range" id="roundness" min="0" max="1" step="0.01" value="0.5"/>
         </label>
       </div>
 
       <div class="group">
-        <h3>Bake settings</h3>
+        <h3>굽기 설정</h3>
         <label class="row">
-          <div class="lab"><span>Frames</span></div>
+          <div class="lab"><span>프레임 수</span></div>
           <select id="frames">
             <option value="8">8</option>
             <option value="16" selected>16</option>
@@ -202,7 +208,7 @@
           </select>
         </label>
         <label class="row">
-          <div class="lab"><span>Frame size (px)</span></div>
+          <div class="lab"><span>프레임 크기 (px)</span></div>
           <select id="frameSize">
             <option value="128">128</option>
             <option value="256" selected>256</option>
@@ -210,95 +216,116 @@
           </select>
         </label>
         <label class="row">
-          <div class="lab"><span>Rotation axis</span></div>
+          <div class="lab"><span>회전 축</span></div>
           <select id="axis">
-            <option value="x" selected>End-over-end (X)</option>
-            <option value="y">Spin (Y)</option>
+            <option value="x" selected>앞뒤로 굴리기 (X축)</option>
+            <option value="y">제자리 돌리기 (Y축)</option>
           </select>
         </label>
         <label class="row">
-          <div class="lab"><span>Light angle</span><b id="lightVal">35&deg;</b></div>
+          <div class="lab"><span>조명 각도</span><b id="lightVal">35&deg;</b></div>
           <input type="range" id="light" min="0" max="360" step="1" value="35"/>
         </label>
       </div>
 
-      <button class="primary" id="bakeBtn" disabled>Bake Sprite Sheet</button>
-      <div class="hint" id="status">Load a PNG to begin.</div>
+      <button class="primary" id="bakeBtn" disabled>스프라이트 시트 굽기</button>
+      <div class="hint" id="status">PNG를 불러오면 시작합니다.</div>
     </div>
 
     <!-- ============ ANIMATE CONTROLS ============ -->
     <div class="panel-controls hidden" id="walkControls">
       <div class="group">
-        <h3>Creature image</h3>
+        <h3>캐릭터 이미지</h3>
         <div class="drop" id="wdrop">
-          <div><b>Drop any creature PNG</b></div>
-          <div style="margin-top:4px">human, bird, fish, snake&hellip; &middot; transparent bg</div>
+          <div><b>아무 캐릭터 PNG나 끌어다 놓으세요</b></div>
+          <div style="margin-top:4px">사람, 새, 물고기, 뱀&hellip; &middot; 투명 배경</div>
           <input type="file" id="wfile" accept="image/png,image/*" style="display:none" />
         </div>
-        <div class="src-preview" id="wsrcPrev"><img id="wsrcImg" alt="creature"/></div>
-        <button class="ghost" id="wPasteBtn" style="margin-top:10px;width:100%">📋 Paste image (or ⌘/Ctrl+V)</button>
+        <div class="src-preview" id="wsrcPrev"><img id="wsrcImg" alt="캐릭터"/></div>
+        <button class="ghost" id="wPasteBtn" style="margin-top:10px;width:100%">📋 이미지 붙여넣기 (또는 ⌘/Ctrl+V)</button>
       </div>
 
       <div class="group">
-        <h3>🤖 AI rig &amp; motions</h3>
-        <div class="hint" style="margin-top:0">The AI looks at the image and authors a bone graph
-          + keyframed motions for whatever body plan it sees. Playback is fully local.</div>
+        <h3>🤖 AI 뼈대 &amp; 모션</h3>
+        <div class="hint" style="margin-top:0">AI가 이미지를 보고, 보이는 몸 구조에 맞는 뼈대와
+          움직임(모션)을 자동으로 만들어 줍니다. 재생은 전부 이 브라우저 안에서만 이뤄집니다.</div>
         <label class="row">
-          <div class="lab"><span>Provider</span></div>
+          <div class="lab"><span>AI 제공사</span></div>
           <select id="aiProvider">
             <option value="gemini" selected>Gemini</option>
             <option value="openai">OpenAI</option>
           </select>
         </label>
         <label class="row" style="display:block">
-          <div class="lab"><span>API key</span></div>
-          <input type="password" id="aiKey" placeholder="paste your key (used in-browser only)" autocomplete="off" />
+          <div class="lab"><span>API 키 <span id="aiKeyMark" style="font-size:13px"></span></span></div>
+          <input type="password" id="aiKey" placeholder="키를 붙여넣으세요 (이 브라우저 안에서만 사용)" autocomplete="off" />
         </label>
-        <label class="row" style="flex-direction:row; align-items:center; gap:8px; justify-content:flex-start">
+        <button class="ghost" id="aiTestKeyBtn" style="width:100%;margin-top:6px">🔑 키 테스트</button>
+        <div class="hint" id="aiKeyStatus" style="margin-top:6px;font-size:13px;line-height:1.5;font-weight:600">키를 입력한 뒤 [🔑 키 테스트]로 확인하세요.</div>
+        <label class="row" style="flex-direction:row; align-items:center; gap:8px; justify-content:flex-start; margin-top:8px">
           <input type="checkbox" id="aiRemember" style="width:auto" />
-          <span style="font-size:12px;color:var(--muted)">remember key in this browser (localStorage)</span>
+          <span style="font-size:12px;color:var(--muted)">이 브라우저에 키 기억하기 (localStorage)</span>
         </label>
         <label class="row" style="display:block">
-          <div class="lab"><span>Model (optional)</span></div>
+          <div class="lab"><span>모델 (선택 사항)</span></div>
           <input type="text" id="aiModel" placeholder="gemini-2.0-flash / gpt-4o-mini" autocomplete="off" />
         </label>
-        <button class="ghost" id="aiAnalyzeBtn" style="width:100%;margin-top:4px" disabled>🤖 Analyze with AI</button>
+        <button class="ghost" id="aiAnalyzeBtn" style="width:100%;margin-top:4px" disabled>🤖 AI로 분석하기</button>
         <div class="hint" style="margin-top:6px;font-size:11px;line-height:1.5">
-          ⚠️ The key is exposed in the browser — use your own key for local use only.
-          AI calls may be blocked from <code>file://</code>; if so, open the hosted https link
-          or run a local server.</div>
+          ⚠️ 키는 브라우저에 그대로 노출됩니다 — 본인 키를 로컬 용도로만 쓰세요.
+          AI 호출은 <code>file://</code>(파일 직접 열기)에서는 막힐 수 있어요. 그럴 땐 배포된 https
+          링크를 열거나 로컬 서버에서 실행하세요.</div>
       </div>
 
       <div class="group">
-        <h3>Rig (drag to fix)</h3>
-        <div class="hint" style="margin-top:0">Circles are joints; lines are bones. Drag a handle to
-          align the rig to your art, then it re-skins automatically.</div>
+        <h3>뼈대 (끌어서 맞추기)</h3>
+        <div class="hint" style="margin-top:0">동그라미는 관절, 선은 뼈입니다. 손잡이를 끌어서
+          뼈대를 그림에 맞추면, 부위가 자동으로 다시 입혀집니다.</div>
         <div class="toolbar" style="margin-top:10px">
-          <button class="ghost" id="wResetBtn">Reset rig</button>
-          <button class="ghost" id="wRebuildBtn">Re-skin parts</button>
+          <button class="ghost" id="wResetBtn">뼈대 초기화</button>
+          <button class="ghost" id="wRebuildBtn">부위 다시 입히기</button>
         </div>
       </div>
 
       <div class="group">
-        <h3>Motion</h3>
+        <h3>🪄 부위 재구성 (실험적 기능)</h3>
+        <div class="hint" style="margin-top:0">납작한 그림 한 장을 잘라내면 몸 뒤에 가려진 부위(접힌 날개,
+          먼 쪽 팔 등)가 잘려 나갑니다. 이 기능은 AI에게 <b>각 부위를 온전한 모습으로</b> 투명 배경에 다시
+          그리게 한 뒤, 관절 위치에 다시 붙여 팔다리가 빈틈 없이 움직이게 합니다. 선택 사항이며 — 건너뛰면
+          그냥 잘라낸 부위를 그대로 씁니다.</div>
+        <label class="row" style="display:block">
+          <div class="lab"><span>이미지 생성 모델</span></div>
+          <input type="text" id="aiImgModel" placeholder="gpt-image-1 / gemini-2.0-flash-preview-image-generation" autocomplete="off" />
+        </label>
+        <button class="ghost" id="wReconstructBtn" style="width:100%;margin-top:4px" disabled>🪄 부위 재구성 (AI)</button>
+        <button class="ghost" id="wRevertReconBtn" style="width:100%;margin-top:6px;display:none">↩︎ 잘라낸 부위로 되돌리기</button>
+        <div class="hint" id="wReconStatus" style="margin-top:6px;font-size:11px;line-height:1.5">
+          위에서 고른 같은 제공사 + 키를 사용합니다. ⚠️ <b>부위 1개당 이미지 생성 1회</b>를 호출합니다
+          (N개 부위 → N회 호출·N배 비용). 품질은 들쭉날쭉할 수 있어요 — 접힌 날개를 펼친 모습으로 다시 그리는
+          건 어렵고, 부위마다 스타일·크기가 조금 달라질 수 있습니다. <code>file://</code>에서는 막힙니다
+          (배포된 https 링크를 여세요).</div>
+      </div>
+
+      <div class="group">
+        <h3>모션</h3>
         <label class="row">
-          <div class="lab"><span>Motion</span></div>
+          <div class="lab"><span>모션</span></div>
           <select id="aiMotion"></select>
         </label>
         <label class="row">
-          <div class="lab"><span>Speed (preview)</span><b id="wSpeedVal">1.00</b></div>
+          <div class="lab"><span>속도 (미리보기)</span><b id="wSpeedVal">1.00</b></div>
           <input type="range" id="wSpeed" min="0.2" max="2.5" step="0.01" value="1.0"/>
         </label>
         <label class="row">
-          <div class="lab"><span>Amount (×)</span><b id="wStrideVal">1.00</b></div>
+          <div class="lab"><span>움직임 크기 (×)</span><b id="wStrideVal">1.00</b></div>
           <input type="range" id="wStride" min="0" max="2.0" step="0.01" value="1.0"/>
         </label>
       </div>
 
       <div class="group">
-        <h3>Bake settings</h3>
+        <h3>굽기 설정</h3>
         <label class="row">
-          <div class="lab"><span>Frames</span></div>
+          <div class="lab"><span>프레임 수</span></div>
           <select id="wFrames">
             <option value="8">8</option>
             <option value="12" selected>12</option>
@@ -307,7 +334,7 @@
           </select>
         </label>
         <label class="row">
-          <div class="lab"><span>Frame size (px)</span></div>
+          <div class="lab"><span>프레임 크기 (px)</span></div>
           <select id="wFrameSize">
             <option value="128">128</option>
             <option value="256" selected>256</option>
@@ -316,8 +343,8 @@
         </label>
       </div>
 
-      <button class="primary" id="wBakeBtn" disabled>Bake Motion Sheet</button>
-      <div class="hint" id="wStatus">Load a creature to begin.</div>
+      <button class="primary" id="wBakeBtn" disabled>모션 시트 굽기</button>
+      <div class="hint" id="wStatus">캐릭터를 불러오면 시작합니다.</div>
     </div>
   </aside>
 
@@ -326,62 +353,62 @@
     <!-- ============ SPIN STAGE ============ -->
     <div class="panel-stage" id="spinStage">
       <div class="card live-wrap">
-        <h2>Live preview (tuning viewer)</h2>
+        <h2>실시간 미리보기 (조절용 뷰어)</h2>
         <canvas id="liveCanvas"></canvas>
-        <div class="hint">Auto-rotating. Tweak the mode &amp; sliders on the left — this updates instantly.</div>
+        <div class="hint">자동으로 회전합니다. 왼쪽에서 방식과 슬라이더를 바꾸면 — 즉시 반영됩니다.</div>
       </div>
 
       <div class="card bake-out" id="bakeOut">
-        <h2>Baked sprite sheet</h2>
-        <div class="strip-scroll"><img id="stripImg" alt="sprite strip"/></div>
+        <h2>완성된 스프라이트 시트</h2>
+        <div class="strip-scroll"><img id="stripImg" alt="스프라이트 시트"/></div>
         <div class="flip-row">
           <div class="flip-box">
             <canvas id="flipCanvas" width="160" height="160"></canvas>
-            <div class="cap">Flipbook preview</div>
+            <div class="cap">플립북 미리보기</div>
           </div>
           <div class="toolbar">
-            <button class="ghost" id="dlBtn">Download PNG</button>
+            <button class="ghost" id="dlBtn">PNG 내려받기</button>
           </div>
         </div>
         <div class="caption" id="caption"></div>
       </div>
 
       <div class="card" id="emptyCard">
-        <div class="empty">No sheet baked yet. Load an image, tune it, then press <b>Bake Sprite Sheet</b>.</div>
+        <div class="empty">아직 구운 시트가 없어요. 이미지를 불러와 조절한 뒤 <b>스프라이트 시트 굽기</b>를 누르세요.</div>
       </div>
     </div>
 
     <!-- ============ ANIMATE STAGE ============ -->
     <div class="panel-stage hidden" id="walkStage">
       <div class="card live-wrap">
-        <h2>Rig editor — drag joints to fit</h2>
+        <h2>뼈대 편집기 — 관절을 끌어서 맞추기</h2>
         <canvas id="walkRigCanvas"></canvas>
-        <div class="hint">Circles are joints; lines are bones. Drag a handle to align the rig to your art, then it re-skins automatically.</div>
+        <div class="hint">동그라미는 관절, 선은 뼈입니다. 손잡이를 끌어 뼈대를 그림에 맞추면 부위가 자동으로 다시 입혀집니다.</div>
       </div>
 
       <div class="card live-wrap" id="walkPrevCard" style="display:none">
-        <h2>Live motion preview</h2>
+        <h2>실시간 모션 미리보기</h2>
         <canvas id="walkPreviewCanvas"></canvas>
-        <div class="hint">Looping the selected motion. Pick a motion &amp; tune speed / amount on the left.</div>
+        <div class="hint">선택한 모션을 반복 재생합니다. 왼쪽에서 모션을 고르고 속도·움직임 크기를 조절하세요.</div>
       </div>
 
       <div class="card bake-out" id="wBakeOut">
-        <h2>Baked motion sheet</h2>
-        <div class="strip-scroll"><img id="wStripImg" alt="motion strip"/></div>
+        <h2>완성된 모션 시트</h2>
+        <div class="strip-scroll"><img id="wStripImg" alt="모션 시트"/></div>
         <div class="flip-row">
           <div class="flip-box">
             <canvas id="walkFlipCanvas" width="160" height="160"></canvas>
-            <div class="cap">Flipbook preview</div>
+            <div class="cap">플립북 미리보기</div>
           </div>
           <div class="toolbar">
-            <button class="ghost" id="wDlBtn">Download PNG</button>
+            <button class="ghost" id="wDlBtn">PNG 내려받기</button>
           </div>
         </div>
         <div class="caption" id="wCaption"></div>
       </div>
 
       <div class="card" id="wEmptyCard">
-        <div class="empty">No motion sheet baked yet. Load a creature PNG, analyze with AI (or use a fallback motion), then press <b>Bake Motion Sheet</b>.</div>
+        <div class="empty">아직 구운 모션 시트가 없어요. 캐릭터 PNG를 불러와 AI로 분석(또는 기본 모션 사용)한 뒤 <b>모션 시트 굽기</b>를 누르세요.</div>
       </div>
     </div>
   </main>
@@ -1010,7 +1037,7 @@ const els = {
 function setStatus(t){ els.status.textContent = t; }
 
 async function handleImageSrc(src, name){
-  setStatus('Building mesh…');
+  setStatus('메시 만드는 중…');
   const img = await loadImage(src);
   if (name){
     const base = name.replace(/\.[^.]+$/, '').replace(/[^\w\-]+/g,'_') || 'sprite';
@@ -1020,7 +1047,7 @@ async function handleImageSrc(src, name){
   els.srcPrev.style.display = 'block';
   await rebuildFromImage(img);
   els.bakeBtn.disabled = false;
-  setStatus('Ready. Tune & bake.');
+  setStatus('준비 완료. 조절하고 구우세요.');
 }
 
 // drag/drop + file
@@ -1073,7 +1100,7 @@ function startFlipbook(stripCanvas, N, fs){
 let lastBake = null;
 els.bakeBtn.addEventListener('click', async ()=>{
   els.bakeBtn.disabled = true;
-  setStatus('Baking '+state.frames+' frames…');
+  setStatus(state.frames+'프레임 굽는 중…');
   try{
     const res = await bake();
     lastBake = res;
@@ -1081,12 +1108,12 @@ els.bakeBtn.addEventListener('click', async ()=>{
     els.bakeOut.style.display = 'block';
     els.emptyCard.style.display = 'none';
     els.caption.textContent =
-      `Sheet: ${res.w} × ${res.h}px  (${res.frames} frames × ${state.frameSize}px, ` +
-      `mode: ${state.mode}, axis: ${state.axis==='x'?'end-over-end':'spin'})`;
+      `시트: ${res.w} × ${res.h}px  (${res.frames}프레임 × ${state.frameSize}px, ` +
+      `방식: ${state.mode}, 축: ${state.axis==='x'?'앞뒤로 굴리기':'제자리 돌리기'})`;
     startFlipbook(res.canvas, res.frames, state.frameSize);
-    setStatus('Baked. Download ready.');
+    setStatus('완성! 내려받을 수 있어요.');
   }catch(err){
-    setStatus('Bake failed: '+err.message);
+    setStatus('굽기 실패: '+err.message);
     console.error(err);
   }finally{
     els.bakeBtn.disabled = false;
@@ -1138,6 +1165,9 @@ const wstate = {
   speed: 1.0,            // preview playback speed
   amount: 1.0,           // global motion amplitude multiplier
   frames: 12, frameSize: 256,
+  // ---- part reconstruction (experimental, optional) ----
+  recon: {},             // map: partName -> { canvas, ox, oy, cw, ch }  (reconstructed + re-anchored)
+  reconActive: false,    // true once at least one part has been reconstructed & applied
 };
 
 /* ---- raster the source into a working canvas + mask + bbox ---- */
@@ -1453,6 +1483,106 @@ function buildParts(){
   parts.forEach(p=>depthOf[p.part]=depth(p));
   parts.sort((a,c)=> depthOf[a.part]-depthOf[c.part]);
   wstate.parts=parts;
+  // EXPERIMENTAL: swap in reconstructed complete parts (re-anchored to joints)
+  if(wstate.reconActive) applyReconToParts();
+}
+
+/* ============================================================
+   PART RECONSTRUCTION (experimental) — replace each cut part's texture
+   with an AI-redrawn COMPLETE version on a transparent background, then
+   RE-ANCHOR it so the joint/pivot stays put.
+
+   Anchoring strategy (keeps the pivot at the joint):
+   For each part we have the live CUTOUT fragment (a crop with visible
+   alpha) and the RECONSTRUCTED complete image. We:
+     1) measure the visible-alpha bbox + centroid of BOTH (in their own
+        canvas pixels),
+     2) SCALE the reconstructed image so its visible bbox roughly matches
+        the fragment's visible bbox size (overlapping region lines up),
+     3) TRANSLATE so the reconstructed visible centroid lands on the SAME
+        raster centroid as the fragment's visible centroid,
+     4) recompute the part's ox/oy (canvas top-left in raster space) from
+        that placement while leaving pivotX/pivotY untouched — so the bone
+        pivot, and therefore the joint, never moves.
+   The extra (previously-hidden) geometry simply extends outward from the
+   anchored, aligned overlap.
+   ============================================================ */
+
+/* visible-alpha bbox + centroid of a canvas (alpha>16). null if empty. */
+function visibleStats(canvas){
+  const w=canvas.width, h=canvas.height;
+  if(w<1||h<1) return null;
+  const d=canvas.getContext('2d').getImageData(0,0,w,h).data;
+  let x0=w,y0=h,x1=-1,y1=-1, sx=0,sy=0,n=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    if(d[(y*w+x)*4+3]>16){ if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y; sx+=x; sy+=y; n++; }
+  }
+  if(n===0) return null;
+  return { x0,y0,x1,y1, w:x1-x0+1, h:y1-y0+1, cx:sx/n, cy:sy/n, count:n };
+}
+
+/* draw an Image/canvas onto a fresh transparent canvas of its natural size */
+function toCanvas(img){
+  const w=Math.max(1, img.naturalWidth||img.width||1);
+  const h=Math.max(1, img.naturalHeight||img.height||1);
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  c.getContext('2d').drawImage(img,0,0,w,h);
+  return c;
+}
+
+/* Re-anchor ONE reconstructed complete-part image to a live cutout part.
+   `part` is a freshly-built cutout part (has canvas, ox, oy, cw, ch, pivotX,
+   pivotY in raster coords). `reconImg` is the complete-part Image/canvas.
+   Returns { canvas, ox, oy, cw, ch } in the SAME raster coordinate frame,
+   with the pivot left exactly where it was. */
+function reanchorPart(part, reconImg){
+  const frag = visibleStats(part.canvas);
+  let rc = toCanvas(reconImg);
+  const rstat = visibleStats(rc);
+  // Fragment top-left in RASTER coords (cutout pixel -> raster): raster = ox + canvasPix
+  if(!frag || !rstat){
+    // nothing to align against — just place the recon centered on the cutout box
+    return { canvas:rc, ox:part.ox, oy:part.oy, cw:rc.width, ch:rc.height };
+  }
+  // raster-space centroid of the original fragment (where it must stay)
+  const fragRasterCx = part.ox + frag.cx;
+  const fragRasterCy = part.oy + frag.cy;
+  // scale recon visible bbox -> fragment visible bbox (use diagonal for stability),
+  // clamped so a wildly different crop can't blow up.
+  const fragDiag = Math.hypot(frag.w, frag.h);
+  const reconDiag = Math.hypot(rstat.w, rstat.h);
+  let scale = reconDiag>1 ? (fragDiag/reconDiag) : 1;
+  scale = Math.max(0.25, Math.min(4, scale));
+  // scaled recon canvas
+  let scaled = rc;
+  if(Math.abs(scale-1) > 0.02){
+    const sw=Math.max(1,Math.round(rc.width*scale)), sh=Math.max(1,Math.round(rc.height*scale));
+    const sc=document.createElement('canvas'); sc.width=sw; sc.height=sh;
+    sc.getContext('2d').drawImage(rc,0,0,sw,sh);
+    scaled=sc;
+  }
+  // recon visible centroid in scaled-canvas pixels
+  const reconCx = rstat.cx*scale, reconCy = rstat.cy*scale;
+  // place scaled canvas so recon centroid lands on the fragment's raster centroid:
+  //   ox + reconCx = fragRasterCx  ->  ox = fragRasterCx - reconCx
+  const ox = fragRasterCx - reconCx;
+  const oy = fragRasterCy - reconCy;
+  return { canvas:scaled, ox, oy, cw:scaled.width, ch:scaled.height };
+}
+
+/* Apply the stored reconstructed images to the live cutout parts in-place,
+   re-anchoring each. Parts WITHOUT a recon entry keep their cutout. */
+function applyReconToParts(){
+  const recon=wstate.recon||{};
+  for(const p of wstate.parts){
+    const entry=recon[p.part];
+    if(!entry || !entry.img) continue;
+    try{
+      const a=reanchorPart(p, entry.img);
+      p.canvas=a.canvas; p.ox=a.ox; p.oy=a.oy; p.cw=a.cw; p.ch=a.ch;
+      p._reconstructed=true;
+    }catch(e){ console.warn('reanchor failed for', p.part, e); }
+  }
 }
 
 /* ============================================================
@@ -1561,18 +1691,53 @@ const wEls = {
   // AI controls
   provider: document.getElementById('aiProvider'),
   key: document.getElementById('aiKey'),
+  keyMark: document.getElementById('aiKeyMark'),
+  keyStatus: document.getElementById('aiKeyStatus'),
+  testKeyBtn: document.getElementById('aiTestKeyBtn'),
   remember: document.getElementById('aiRemember'),
   model: document.getElementById('aiModel'),
   analyzeBtn: document.getElementById('aiAnalyzeBtn'),
+  // reconstruction (experimental)
+  imgModel: document.getElementById('aiImgModel'),
+  reconstructBtn: document.getElementById('wReconstructBtn'),
+  revertReconBtn: document.getElementById('wRevertReconBtn'),
+  reconStatus: document.getElementById('wReconStatus'),
 };
-function wSetStatus(t){ wEls.status.textContent=t; }
+function wSetStatus(t){ wEls.status.classList.remove('stat-ok','stat-bad','stat-busy','stat-pulse'); wEls.status.textContent=t; }
+/* prominent staged status: kind = 'ok' | 'bad' | 'busy' | '' */
+function wSetStatusState(t, kind){
+  const el=wEls.status;
+  el.classList.remove('stat-ok','stat-bad','stat-busy','stat-pulse');
+  el.textContent=t;
+  if(kind==='ok'){ el.classList.add('stat-ok','stat-pulse'); }
+  else if(kind==='bad'){ el.classList.add('stat-bad','stat-pulse'); }
+  else if(kind==='busy'){ el.classList.add('stat-busy'); }
+}
+
+/* Korean display labels for motion ids (id stays as-is for playback + hooks).
+   Built-in fallbacks: 'walk/swing', 'idle bob'. AI motions get common-name
+   translations where known, else the raw id is shown. */
+const MOTION_LABELS={
+  'walk/swing':'걷기/흔들기', 'idle bob':'대기(살랑)',
+  'walk':'걷기', 'run':'달리기', 'swing':'흔들기',
+  'idle':'대기', 'bob':'살랑', 'flap':'날갯짓', 'fly':'날기',
+  'jump':'점프', 'slither':'스르륵(뱀)', 'swim':'헤엄', 'wave':'손 흔들기',
+  'wiggle':'꿈틀', 'bounce':'통통 튀기', 'dance':'춤', 'crawl':'기어가기',
+  'attack':'공격', 'hop':'깡총', 'spin':'빙글', 'nod':'끄덕임'
+};
+function motionLabel(id){
+  if(id==null) return id;
+  if(MOTION_LABELS[id]) return MOTION_LABELS[id];
+  const k=String(id).toLowerCase();
+  return MOTION_LABELS[k] || id;
+}
 
 /* populate the motion dropdown from wstate.motions */
 function refreshMotionDropdown(){
   const sel=wEls.motion; const prev=wstate.motionName;
   sel.innerHTML='';
   for(const m of wstate.motions){
-    const o=document.createElement('option'); o.value=m.name; o.textContent=m.name; sel.appendChild(o);
+    const o=document.createElement('option'); o.value=m.name; o.textContent=motionLabel(m.name); sel.appendChild(o);
   }
   if(wstate.motions.length){
     if(!prev || !wstate.motions.some(m=>m.name===prev)) wstate.motionName=wstate.motions[0].name;
@@ -1697,11 +1862,12 @@ function applyRig(joints, motions, opts){
   refreshMotionDropdown();
   drawRig(); ensureWalkPreview();
   wEls.bakeBtn.disabled=!wstate.parts.length;
+  if(wEls.reconstructBtn) wEls.reconstructBtn.disabled=!wstate.parts.length;
 }
 
 /* ---- load a creature image (sets up a fallback rig + motions) ---- */
 async function wHandleSrc(src,name){
-  wSetStatus('Reading creature…');
+  wSetStatus('캐릭터 읽는 중…');
   const img=await loadImage(src);
   if(name){ wstate.basename=(name.replace(/\.[^.]+$/,'').replace(/[^\w\-]+/g,'_')||'creature'); }
   wstate.img=img; wstate.imgW=img.width; wstate.imgH=img.height;
@@ -1709,11 +1875,14 @@ async function wHandleSrc(src,name){
   wstate.rc=r.c; wstate.rctx=r.cx; wstate.rw=r.w; wstate.rh=r.h;
   wstate.rdata=r.data; wstate.mask=r.mask; wstate.bbox=r.bbox;
   wstate.centers=rowCenters(r.mask,r.w,r.h);
+  // new image -> drop any previous reconstruction
+  wstate.recon={}; wstate.reconActive=false;
+  if(wEls.revertReconBtn) wEls.revertReconBtn.style.display='none';
   wEls.srcImg.src=src; wEls.srcPrev.style.display='block';
   wEls.analyzeBtn.disabled=false;
   // default to a simple fallback rig so the tool is usable before/without AI
   applyRig(fallbackRig(r.bbox, wstate.centers), []);
-  wSetStatus('Loaded. Analyze with AI, or drag joints + pick a fallback motion.');
+  wSetStatus('불러왔어요. AI로 분석하거나, 관절을 끌어 맞추고 기본 모션을 골라보세요.');
 }
 
 wEls.drop.addEventListener('click', ()=> wEls.file.click());
@@ -1756,7 +1925,65 @@ wEls.remember.addEventListener('change', ()=>{
 });
 wEls.key.addEventListener('input', ()=>{
   if(wEls.remember.checked){ try{ localStorage.setItem(AI_KEY_LS, wEls.key.value||''); }catch(_){} }
+  // editing the key invalidates a previous test result
+  if(wEls.keyMark){ wEls.keyMark.textContent=''; wEls.keyMark.className=''; wEls.keyMark.style.color=''; }
 });
+
+/* ---- KEY-TEST: minimal validation call so the user KNOWS the key works ---- */
+function setKeyStatus(text, kind){
+  if(wEls.keyStatus){
+    wEls.keyStatus.classList.remove('stat-ok','stat-bad','stat-busy','stat-pulse');
+    wEls.keyStatus.textContent=text;
+    if(kind==='ok') wEls.keyStatus.classList.add('stat-ok','stat-pulse');
+    else if(kind==='bad') wEls.keyStatus.classList.add('stat-bad','stat-pulse');
+    else if(kind==='busy') wEls.keyStatus.classList.add('stat-busy');
+  }
+  if(wEls.keyMark){
+    if(kind==='ok'){ wEls.keyMark.textContent='✓'; wEls.keyMark.style.color='var(--accent2)'; }
+    else if(kind==='bad'){ wEls.keyMark.textContent='✗'; wEls.keyMark.style.color='#ff5a5a'; }
+    else if(kind==='busy'){ wEls.keyMark.textContent='…'; wEls.keyMark.style.color='var(--accent)'; }
+    else { wEls.keyMark.textContent=''; wEls.keyMark.style.color=''; }
+  }
+}
+async function testAIKey(){
+  const provider=wEls.provider.value;
+  const key=(wEls.key.value||'').trim();
+  if(!key){ setKeyStatus('API 키를 먼저 입력하세요.', 'bad'); return; }
+  setKeyStatus('🔑 키 확인 중… ('+provider+')', 'busy');
+  wEls.testKeyBtn.disabled=true;
+  try{
+    let resp;
+    if(provider==='openai'){
+      resp=await fetch('https://api.openai.com/v1/models', {
+        method:'GET', headers:{ 'Authorization':'Bearer '+key }
+      });
+    } else {
+      resp=await fetch('https://generativelanguage.googleapis.com/v1beta/models?key='+encodeURIComponent(key), {
+        method:'GET'
+      });
+    }
+    if(resp.ok){
+      setKeyStatus('✅ 키 정상 ('+provider+')', 'ok');
+    } else if(resp.status===401 || resp.status===403 || resp.status===400){
+      setKeyStatus('❌ 키 오류: 유효하지 않은 키 (HTTP '+resp.status+')', 'bad');
+    } else if(resp.status===429){
+      setKeyStatus('❌ 키 오류: 요청 한도 초과 (HTTP 429) — 잠시 후 다시 시도하세요', 'bad');
+    } else {
+      setKeyStatus('❌ 키 확인 실패 (HTTP '+resp.status+')', 'bad');
+    }
+  }catch(err){
+    const msg=String(err&&err.message||err);
+    console.warn('key test failed:', msg);
+    if(location.protocol==='file:'){
+      setKeyStatus('❌ 연결 실패 — 파일을 직접 열면(file://) 막혀요. 배포된 https 링크에서 시도하세요.', 'bad');
+    } else {
+      setKeyStatus('❌ 연결 실패 — 네트워크·CORS 오류. 배포된 https 링크에서 시도하세요.', 'bad');
+    }
+  }finally{
+    wEls.testKeyBtn.disabled=false;
+  }
+}
+wEls.testKeyBtn.addEventListener('click', testAIKey);
 
 const AI_PROMPT = `You are a 2D character rigger. Look at the image of a single creature on a transparent/empty background and OUTPUT ONLY JSON (no prose, no markdown).
 Identify the body plan (human, bird, rabbit, fish, snake, insect, etc.) and author a bone graph + keyframed motions that suit THAT body plan. The SAME action differs per body plan (a bird "walk" uses legs; a "flap" rotates wings; a snake "slither" waves the body) — choose motions and joints that make sense for what you see.
@@ -1823,42 +2050,221 @@ async function callOpenAI(dataURI, model, key){
   return extractJSON(text);
 }
 
-async function analyzeWithAI(){
-  if(!wstate.img){ wSetStatus('Load a creature image first.'); return; }
+/* ============================================================
+   PART RECONSTRUCTION — image-gen API calls (OpenAI / Gemini).
+   For each rig part we send the cutout (padded onto a transparent square)
+   and ask the model to redraw the COMPLETE, isolated part on a transparent
+   background, then read back the generated image as a data URL.
+   ============================================================ */
+const AI_IMG_DEFAULT_MODEL={ openai:'gpt-image-1', gemini:'gemini-2.0-flash-preview-image-generation' };
+
+/* pad a part's cutout onto a transparent SQUARE canvas (centered) so the
+   model has room to "unfold"/extend hidden geometry around it. */
+function padPartToSquare(partCanvas, size){
+  size = size || 512;
+  const c=document.createElement('canvas'); c.width=size; c.height=size;
+  const x=c.getContext('2d');
+  x.clearRect(0,0,size,size);
+  const stat=visibleStats(partCanvas);
+  // fit visible content into ~62% of the square, centered (leaves margin to extend)
+  const srcW=stat?stat.w:partCanvas.width, srcH=stat?stat.h:partCanvas.height;
+  const srcX=stat?stat.x0:0, srcY=stat?stat.y0:0;
+  const target=size*0.62;
+  const s=Math.min(target/Math.max(1,srcW), target/Math.max(1,srcH));
+  const dw=srcW*s, dh=srcH*s;
+  const dx=(size-dw)/2, dy=(size-dh)/2;
+  x.imageSmoothingEnabled=true;
+  x.drawImage(partCanvas, srcX, srcY, srcW, srcH, dx, dy, dw, dh);
+  return c;
+}
+
+function reconPrompt(partName, creature){
+  const cre = creature || 'creature';
+  const nm = (partName||'part').replace(/^b_/,'');
+  return `Complete this ${nm} of a ${cre}. Show the FULL ${nm} (extend/unfold any portion hidden behind the body or folded out of view), `
+    + `isolated by itself on a fully transparent background. Keep the SAME flat cartoon art style, line weight and colors as the input. `
+    + `Do NOT draw any other body parts. Center the ${nm}, fill the frame, transparent everywhere else. Output a PNG with alpha.`;
+}
+
+/* dataURL -> Blob (for multipart upload) */
+function dataURLtoBlob(dataURL){
+  const i=dataURL.indexOf(','); const meta=dataURL.slice(0,i); const b64=dataURL.slice(i+1);
+  const mime=(/data:([^;]+)/.exec(meta)||[])[1]||'image/png';
+  const bin=atob(b64); const u8=new Uint8Array(bin.length);
+  for(let k=0;k<bin.length;k++) u8[k]=bin.charCodeAt(k);
+  return new Blob([u8],{type:mime});
+}
+/* load a data URL / url into an Image (reuse loadImage) */
+function loadImageEl(src){ return loadImage(src); }
+
+/* ---- OpenAI images/edits (gpt-image-1) — transparent bg, returns b64 PNG ----
+   Endpoint: POST https://api.openai.com/v1/images/edits  (multipart/form-data)
+   fields: model, image (PNG file), prompt, size, background=transparent, n=1
+   Response: { data:[{ b64_json }] }  -> data:image/png;base64,<b64_json>
+   Fallback: if edits errors, POST images/generations (JSON) with the prompt. */
+async function openaiReconstructPart(squareCanvas, prompt, model, key){
+  const blob=dataURLtoBlob(squareCanvas.toDataURL('image/png'));
+  const fd=new FormData();
+  fd.append('model', model);
+  fd.append('image', blob, 'part.png');
+  fd.append('prompt', prompt);
+  fd.append('size', '1024x1024');
+  fd.append('background', 'transparent');   // request a transparent background
+  fd.append('n', '1');
+  let r=await fetch('https://api.openai.com/v1/images/edits', {
+    method:'POST', headers:{ 'Authorization':'Bearer '+key }, body:fd
+  });
+  if(!r.ok){
+    const tx=await r.text().catch(()=> '');
+    // fall back to generations (no input image) if edits is rejected
+    const g=await fetch('https://api.openai.com/v1/images/generations', {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key },
+      body:JSON.stringify({ model, prompt, size:'1024x1024', background:'transparent', n:1 })
+    });
+    if(!g.ok){ const gt=await g.text().catch(()=> ''); throw new Error('OpenAI img HTTP '+r.status+'/'+g.status+' '+(tx||gt).slice(0,160)); }
+    r=g;
+  }
+  const j=await r.json();
+  const b64=j?.data?.[0]?.b64_json;
+  const url=j?.data?.[0]?.url;
+  if(b64) return 'data:image/png;base64,'+b64;
+  if(url) return url;   // some configs return a URL
+  throw new Error('OpenAI img: no image in response');
+}
+
+/* ---- Gemini image generation (:generateContent) — inline image in/out ----
+   Endpoint: POST .../models/{model}:generateContent?key=...
+   body: { contents:[{ parts:[ {inline_data:{mime_type,data}}, {text:prompt} ] }],
+           generationConfig:{ responseModalities:['IMAGE','TEXT'] } }
+   Response inline image: candidates[0].content.parts[*].inline_data.data (b64). */
+async function geminiReconstructPart(squareCanvas, prompt, model, key){
+  const uri=squareCanvas.toDataURL('image/png');
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+  const body={
+    contents:[{ parts:[
+      { inline_data:{ mime_type:'image/png', data:dataURItoBase64(uri) } },
+      { text:prompt }
+    ]}],
+    generationConfig:{ responseModalities:['IMAGE','TEXT'] }
+  };
+  const r=await fetch(url,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+  if(!r.ok){ const tx=await r.text().catch(()=> ''); throw new Error('Gemini img HTTP '+r.status+' '+tx.slice(0,160)); }
+  const j=await r.json();
+  const parts=j?.candidates?.[0]?.content?.parts||[];
+  for(const p of parts){
+    const inl=p.inline_data||p.inlineData;
+    if(inl && inl.data){ const mime=inl.mime_type||inl.mimeType||'image/png'; return 'data:'+mime+';base64,'+inl.data; }
+  }
+  throw new Error('Gemini img: no inline image in response');
+}
+
+/* reconstruct ONE part -> data URL of the complete part PNG */
+async function reconstructOnePart(partCanvas, partName, provider, imgModel, key){
+  const sq=padPartToSquare(partCanvas, 512);
+  const prompt=reconPrompt(partName, wstate.creature);
+  if(provider==='openai') return await openaiReconstructPart(sq, prompt, imgModel, key);
+  return await geminiReconstructPart(sq, prompt, imgModel, key);
+}
+
+let _reconBusy=false;
+function wSetReconStatus(t){ if(wEls.reconStatus) wEls.reconStatus.innerHTML=t; }
+
+/* orchestrate: reconstruct every rig part with per-part error tolerance */
+async function reconstructAllParts(){
+  if(_reconBusy) return;
+  if(!wstate.parts.length){ wSetReconStatus('먼저 부위를 만드세요 (캐릭터 불러오기 / AI 분석).'); return; }
   const provider=wEls.provider.value;
   const key=(wEls.key.value||'').trim();
-  if(!key){ wSetStatus('Enter your '+provider+' API key first.'); return; }
+  if(!key){ wSetReconStatus('API 키를 먼저 입력하세요.'); return; }
+  const imgModel=(wEls.imgModel.value||'').trim() || AI_IMG_DEFAULT_MODEL[provider];
+  // skip 1×1 placeholder parts (empty bones)
+  const targets=wstate.parts.filter(p=>p.canvas && p.canvas.width>2 && p.canvas.height>2);
+  if(!targets.length){ wSetReconStatus('재구성할 만한 부위가 없어요.'); return; }
+  _reconBusy=true; wEls.reconstructBtn.disabled=true;
+  let done=0, failed=0; const fails=[];
+  wSetReconStatus(`🪄 ${targets.length}개 부위 재구성 중… (${provider} · ${imgModel} · 이미지 생성 ${targets.length}회 호출)`);
+  for(const p of targets){
+    const label=p.part.replace(/^b_/,'');
+    wSetReconStatus(`🪄 <b>${label}</b> 재구성 중… (${done+failed+1}/${targets.length})`);
+    try{
+      const url=await reconstructOnePart(p.canvas, p.part, provider, imgModel, key);
+      const img=await loadImageEl(url);
+      wstate.recon[p.part]={ img };
+      done++;
+    }catch(err){
+      failed++; fails.push(label);
+      console.warn('reconstruct failed:', p.part, err);
+      const msg=String(err&&err.message||err);
+      if(/Failed to fetch|NetworkError|Load failed|CORS/i.test(msg) && location.protocol==='file:'){
+        wSetReconStatus('❌ 이미지 생성이 <code>file://</code>(파일 직접 열기)에서 막혔어요 — 배포된 https 링크를 열거나 로컬 서버에서 실행하세요. (잘라낸 부위는 그대로 유지됩니다.)');
+        _reconBusy=false; wEls.reconstructBtn.disabled=false; return;
+      }
+    }
+  }
+  if(done>0){
+    wstate.reconActive=true;
+    buildParts();           // rebuilds cutouts then swaps in + re-anchors recon parts
+    drawRig(); ensureWalkPreview();
+    wEls.revertReconBtn.style.display='block';
+  }
+  const note = failed
+    ? ` 성공 ${done}개, 실패 ${failed}개 (${fails.join(', ')}) — 실패한 부위는 잘라낸 그대로 유지됩니다.`
+    : ` 전체 ${done}개 부위를 재구성하고 관절에 다시 붙였어요.`;
+  wSetReconStatus((done>0?'🪄 완료.':'재구성된 부위가 없어요.')+note);
+  _reconBusy=false; wEls.reconstructBtn.disabled=false;
+}
+
+/* revert: drop reconstructed parts, go back to plain cutouts */
+function revertReconstruction(){
+  wstate.recon={}; wstate.reconActive=false;
+  buildParts(); drawRig(); ensureWalkPreview();
+  wEls.revertReconBtn.style.display='none';
+  wSetReconStatus('잘라낸 부위로 되돌렸어요.');
+}
+
+async function analyzeWithAI(){
+  if(!wstate.img){ wSetStatusState('먼저 캐릭터 이미지를 불러오세요.', 'bad'); return; }
+  const provider=wEls.provider.value;
+  const key=(wEls.key.value||'').trim();
+  if(!key){ wSetStatusState('API 키를 먼저 입력하세요.', 'bad'); return; }
   const model=(wEls.model.value||'').trim() || AI_DEFAULT_MODEL[provider];
   // source data URI at modest size to keep payload small
   const srcURI = wEls.srcImg.src && wEls.srcImg.src.startsWith('data:') ? wEls.srcImg.src : null;
   let dataURI=srcURI;
   if(!dataURI && wstate.rc){ dataURI=wstate.rc.toDataURL('image/png'); }
-  if(!dataURI){ wSetStatus('No image data to send.'); return; }
-  wEls.analyzeBtn.disabled=true; wSetStatus('Asking '+provider+' ('+model+')…');
+  if(!dataURI){ wSetStatusState('보낼 이미지 데이터가 없어요.', 'bad'); return; }
+  wEls.analyzeBtn.disabled=true; wSetStatusState('🔍 이미지 분석 중… ('+provider+')', 'busy');
   try{
     const json = provider==='openai' ? await callOpenAI(dataURI,model,key) : await callGemini(dataURI,model,key);
     const joints=normalizeRigJSON(json, wstate.rw, wstate.rh);
     const motions=normalizeMotions(json.motions||[]);
     wstate.creature=String(json.creature||'');
     applyRig(joints, motions);  // fallbacks appended automatically
-    const mList=wstate.motions.map(m=>m.name).join(', ');
-    wSetStatus('AI rig: '+(wstate.creature||'creature')+' · '+joints.length+' joints · motions: '+mList);
+    const cname=wstate.creature||'캐릭터';
+    wSetStatusState('✅ 인식 완료: '+cname+' · 관절 '+joints.length+'개 · 모션 '+wstate.motions.length+'개', 'ok');
   }catch(err){
     console.error(err);
     const msg=String(err&&err.message||err);
     const corsLike = msg==='Failed to fetch' || /NetworkError|Load failed|CORS/i.test(msg);
+    const keyErr = /HTTP\s*(400|401|403)\b/.test(msg) || /invalid|unauthor|api[_ ]?key|permission/i.test(msg);
     if(corsLike && location.protocol==='file:'){
-      wSetStatus('AI call blocked from file:// — open the hosted https link, or run a local server. (Rig still editable manually.)');
+      wSetStatusState('❌ 네트워크·CORS 오류 — 파일을 직접 열면(file://) 막혀요. 배포된 https 링크에서 시도하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad');
     } else if(corsLike){
-      wSetStatus('AI call failed (network/CORS). Check key & connection. Rig still editable manually.');
+      wSetStatusState('❌ 네트워크·CORS 오류 — 키와 연결을 확인하거나 배포된 https 링크에서 시도하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad');
+    } else if(keyErr){
+      wSetStatusState('❌ API 키가 올바르지 않아요 — 키를 다시 확인하세요. (뼈대는 직접 편집할 수 있어요.)', 'bad');
+    } else if(/no text from AI|no JSON object|JSON|parse|Unexpected/i.test(msg)){
+      wSetStatusState('❌ AI 응답을 해석하지 못했어요 — 다시 시도해 주세요. (뼈대는 직접 편집할 수 있어요.)', 'bad');
     } else {
-      wSetStatus('AI error: '+msg.slice(0,160)+'  — rig still editable manually.');
+      wSetStatusState('❌ AI 오류: '+msg.slice(0,140)+' — 뼈대는 직접 편집할 수 있어요.', 'bad');
     }
   }finally{
     wEls.analyzeBtn.disabled=false;
   }
 }
 wEls.analyzeBtn.addEventListener('click', analyzeWithAI);
+wEls.reconstructBtn.addEventListener('click', reconstructAllParts);
+wEls.revertReconBtn.addEventListener('click', revertReconstruction);
 
 /* ---- BAKE the motion strip ---- */
 function bakeWalk(){
@@ -1898,14 +2304,14 @@ function motionSlug(){ return (wstate.motionName||'motion').replace(/[^\w\-]+/g,
 
 let wLastBake=null;
 wEls.bakeBtn.addEventListener('click', async ()=>{
-  wEls.bakeBtn.disabled=true; wSetStatus('Baking '+wstate.frames+' frames…');
+  wEls.bakeBtn.disabled=true; wSetStatus(wstate.frames+'프레임 굽는 중…');
   try{
     const res=await bakeWalk(); wLastBake=res;
     wEls.stripImg.src=res.dataURL; wEls.bakeOut.style.display='block'; wEls.emptyCard.style.display='none';
-    wEls.caption.textContent=`Sheet: ${res.w} × ${res.h}px  (${res.frames} frames × ${wstate.frameSize}px, motion: ${wstate.motionName||'—'})`;
+    wEls.caption.textContent=`시트: ${res.w} × ${res.h}px  (${res.frames}프레임 × ${wstate.frameSize}px, 모션: ${motionLabel(wstate.motionName)||'—'})`;
     startWalkFlip(res.canvas,res.frames,wstate.frameSize);
-    wSetStatus('Baked. Download ready.');
-  }catch(err){ wSetStatus('Bake failed: '+err.message); console.error(err); }
+    wSetStatus('완성! 내려받을 수 있어요.');
+  }catch(err){ wSetStatus('굽기 실패: '+err.message); console.error(err); }
   finally{ wEls.bakeBtn.disabled=false; }
 });
 wEls.dlBtn.addEventListener('click', ()=>{ if(!wLastBake)return;
@@ -1927,8 +2333,8 @@ function setFunction(fn){
   spinControls.classList.toggle('hidden',!isSpin); walkControls.classList.toggle('hidden',isSpin);
   spinStage.classList.toggle('hidden',!isSpin); walkStage.classList.toggle('hidden',isSpin);
   subText.innerHTML = isSpin
-    ? 'Spin: top-view PNG &rarr; faux-3D rotation sheet'
-    : 'Animate: any creature PNG &rarr; AI-rigged keyframed motion sheet';
+    ? '입체 회전: 위에서 본 PNG 한 장 &rarr; 입체처럼 도는 회전 시트'
+    : 'AI 애니메이션: 아무 캐릭터 PNG &rarr; AI가 뼈대를 잡아 움직이는 모션 시트';
   if(isSpin){ sizeLiveRenderer(); }
   else { sizeRigCanvas(); sizePrevCanvas(); if(wstate.rc){ drawRig(); ensureWalkPreview(); } }
 }
@@ -1954,9 +2360,9 @@ async function pasteFromButton(){
         const type = it.types.find(t=>t.startsWith('image/'));
         if(type){ const blob=await it.getType(type); const rd=new FileReader(); rd.onload=()=>pasteRoute(rd.result); rd.readAsDataURL(blob); return; }
       }
-      pasteStatus('No image in clipboard — copy an image first, or press ⌘/Ctrl+V.');
-    } else { pasteStatus('Press ⌘/Ctrl+V to paste an image here.'); }
-  }catch(err){ pasteStatus('Clipboard blocked — press ⌘/Ctrl+V instead.'); }
+      pasteStatus('클립보드에 이미지가 없어요 — 먼저 이미지를 복사하거나 ⌘/Ctrl+V를 누르세요.');
+    } else { pasteStatus('여기에 ⌘/Ctrl+V를 눌러 이미지를 붙여넣으세요.'); }
+  }catch(err){ pasteStatus('클립보드 접근이 막혔어요 — 대신 ⌘/Ctrl+V를 누르세요.'); }
 }
 document.getElementById('pasteBtn').addEventListener('click', pasteFromButton);
 document.getElementById('wPasteBtn').addEventListener('click', pasteFromButton);
@@ -2015,6 +2421,8 @@ async function _animateIngest(url, name){
   wstate.rc=r.c; wstate.rctx=r.cx; wstate.rw=r.w; wstate.rh=r.h;
   wstate.rdata=r.data; wstate.mask=r.mask; wstate.bbox=r.bbox;
   wstate.centers=rowCenters(r.mask,r.w,r.h);
+  wstate.recon={}; wstate.reconActive=false;
+  if(wEls.revertReconBtn) wEls.revertReconBtn.style.display='none';
   wEls.srcImg.src=url; wEls.srcPrev.style.display='block';
   wEls.analyzeBtn.disabled=false;
   return r;
@@ -2049,6 +2457,31 @@ const animateAPI = {
   setJoint(name,x,y){ const j=wstate.joints.find(j=>j.name===name); if(!j) throw new Error('no joint '+name);
     j.x=+x; j.y=+y; return true; },
   reskin(){ buildParts(); drawRig(); ensureWalkPreview(); return wstate.parts.length; },
+  /* EXPERIMENTAL: bypass the image-gen API — feed mock COMPLETE part PNGs.
+     map: { partName -> dataURL }.  partName may be the bone part id ('b_wingL')
+     OR the joint/driver name ('wingL'); both are accepted. Re-anchors each
+     reconstructed part to its joint and re-skins.  Returns #applied. */
+  async injectReconstructedParts(map){
+    if(!wstate.parts.length) throw new Error('injectReconstructedParts: rig some parts first');
+    const byPart={}, byDriver={};
+    wstate.parts.forEach(p=>{ byPart[p.part]=p; byDriver[p.driver]=p; });
+    let applied=0;
+    for(const k of Object.keys(map||{})){
+      const target = byPart[k] || byPart['b_'+k] || byDriver[k];
+      if(!target){ console.warn('injectReconstructedParts: no part for', k); continue; }
+      const img=await loadImage(map[k]);
+      wstate.recon[target.part]={ img };
+      applied++;
+    }
+    if(applied>0){
+      wstate.reconActive=true;
+      buildParts(); drawRig(); ensureWalkPreview();
+      if(wEls.revertReconBtn) wEls.revertReconBtn.style.display='block';
+    }
+    return applied;
+  },
+  hasReconstructed(){ return !!wstate.reconActive && wstate.parts.some(p=>p._reconstructed); },
+  revertReconstruction(){ revertReconstruction(); return true; },
   setParam(key,val){
     switch(key){
       case 'speed': wstate.speed=+val; wEls.speed.value=val; wEls.speedVal.textContent=(+val).toFixed(2); break;
