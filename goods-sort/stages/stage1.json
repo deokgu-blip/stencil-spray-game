@@ -7,15 +7,16 @@
   "goods": ["cola", "juice", "milk", "chips", "donut"],
   "combo": { "resetAfterMs": 4000 },
   "scoring": { "starsPerSort": 1, "comboBonus": 1 },
+  "_note": "V3 DEPTH LAYERS: each cubby holds a STACK of layers (rows). layers[0]=FRONT (visible+interactive), layers behind = HIDDEN goods that peek over the top and reveal when the front layer empties. Empty workspace cubbies use layers:[[]] (an empty front layer). Backward-compat: a cubby with flat items:[...] = a single front layer. Counts per type are multiples of 3 (5 types x6=30). 4 cubbies have 2 layers to demonstrate reveal; solvable.",
   "cubbies": [
-    { "r": 0, "c": 0, "items": ["cola", "juice", "milk"] },
-    { "r": 0, "c": 1, "items": ["chips", "donut", "cola"] },
-    { "r": 0, "c": 2, "items": ["juice", "milk", "chips"] },
-    { "r": 1, "c": 0, "items": ["donut", "cola", "juice"] },
-    { "r": 1, "c": 1, "items": ["milk", "chips", "donut"] },
-    { "r": 1, "c": 2, "items": [] },
-    { "r": 2, "c": 0, "items": [] },
-    { "r": 2, "c": 1, "items": [] },
-    { "r": 2, "c": 2, "items": [] }
+    { "r": 0, "c": 0, "layers": [ ["cola", "juice", "milk"], ["chips", "donut", "cola"] ] },
+    { "r": 0, "c": 1, "layers": [ ["donut", "milk", "juice"], ["chips", "cola", "donut"] ] },
+    { "r": 0, "c": 2, "layers": [ ["juice", "milk", "chips"] ] },
+    { "r": 1, "c": 0, "layers": [ ["milk", "donut", "cola"], ["juice", "chips", "milk"] ] },
+    { "r": 1, "c": 1, "layers": [ ["chips", "cola", "donut"], ["juice", "milk", "donut"] ] },
+    { "r": 1, "c": 2, "layers": [ ["cola", "juice", "chips"] ] },
+    { "r": 2, "c": 0, "layers": [ [] ] },
+    { "r": 2, "c": 1, "layers": [ [] ] },
+    { "r": 2, "c": 2, "layers": [ [] ] }
   ]
 }

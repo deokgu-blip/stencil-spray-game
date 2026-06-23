@@ -19,7 +19,10 @@
     --cubby-bg:#ead2a8; --cubby-edge:#c79b5e; --cubby-hole:#b98d50;
     /* 3D shelf wood texture (relative path; zippable for host) */
     --wood-tex: url("../assets/wood.png");
-    --wall-depth: 20px;   /* cubby recess depth in px (CSS-3D) */
+    /* V3: MUCH DEEPER recess — ~2.75x the V2 20px so each cubby reads as a
+       clearly deep box (pronounced back wall + long side walls). The hidden
+       back-layer goods live inside this recess and peek over the front goods. */
+    --wall-depth: 55px;   /* cubby recess depth in px (CSS-3D) */
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body{ margin:0; padding:0; height:100%; overflow:hidden;
@@ -80,11 +83,13 @@
      ============================================================ */
   #board-wrap{ flex:1; width:100%; display:flex; align-items:center; justify-content:center;
     padding:6px 14px 14px; min-height:0;
-    perspective: 1050px; perspective-origin:50% 34%; }
-  /* stage = the tilt container */
+    /* stronger perspective (smaller value) so the DEEP recess reads as real 3D
+       while the shelf stays near-upright; look slightly down into the cubbies. */
+    perspective: 760px; perspective-origin:50% 28%; }
+  /* stage = the tilt container — near-upright tilt, front-facing but deep. */
   #shelf{ position:relative; width:min(92vw, 62vh, 480px); aspect-ratio:1/1.02;
     transform-style:preserve-3d;
-    transform: rotateX(6deg);
+    transform: rotateX(8deg);
     filter: drop-shadow(0 22px 26px rgba(0,0,0,.5)); }
   /* outer wooden frame (the board face the cubbies are carved into) */
   #shelf .frame{ position:absolute; inset:0;
@@ -106,62 +111,113 @@
     transform-style:preserve-3d;
     display:grid; gap:4.5%; }
 
-  /* a single recessed cubby — 5 faces (floor + back + 4 walls via insets) */
+  /* a single recessed cubby — 6 faces (floor + back + 4 side walls).
+     V3: the recess is much DEEPER (--wall-depth 55px), so the side walls are
+     long and the back wall sits far in. Wood reads darker toward the back
+     (gradients deepen with depth) to sell real volume. */
   .cubby{ position:relative; transform-style:preserve-3d; border-radius:10px; }
-  /* BACK wall: pushed in by wall-depth, darkest (in shadow) */
+  /* MOUTH shadow at the opening plane (z=0): a dark inner rim that sells the
+     recess depth (ambient occlusion where the deep box meets the shelf face). */
+  .cubby::before{ content:""; position:absolute; inset:0; border-radius:10px;
+    box-shadow: inset 0 0 16px 4px rgba(0,0,0,.55), inset 0 6px 10px rgba(0,0,0,.4);
+    z-index:6; pointer-events:none; }
+  /* BACK wall: pushed in by full wall-depth, darkest (deep in shadow) */
   .cubby .c-back{ position:absolute; inset:0; border-radius:9px;
     transform: translateZ(calc(-1 * var(--wall-depth)));
-    background-image: linear-gradient(160deg, rgba(0,0,0,.34), rgba(0,0,0,.5)), var(--wood-tex);
+    background-image: linear-gradient(160deg, rgba(0,0,0,.48), rgba(0,0,0,.66)), var(--wood-tex);
     background-size:auto, 120% 120%;
-    box-shadow: inset 0 0 22px rgba(0,0,0,.55); }
-  /* the four inner SIDE walls (top/bottom/left/right) bridge front->back, giving thickness */
+    box-shadow: inset 0 0 34px rgba(0,0,0,.7); }
+  /* the four inner SIDE walls (top/bottom/left/right) bridge front->back over the
+     full depth, giving visible wood thickness. Each wall gradient runs from the
+     bright front edge to a dark back edge so depth reads on the long walls. */
   .cubby .c-wall{ position:absolute; background-image: var(--wood-tex); background-size:cover;
     backface-visibility:hidden; }
   .cubby .c-wall.t{ left:0; right:0; top:0; height:var(--wall-depth);
     transform-origin:top; transform: rotateX(-90deg);
-    background-image: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.28)), var(--wood-tex); }
+    background-image: linear-gradient(rgba(0,0,0,.62),rgba(0,0,0,.22)), var(--wood-tex); }
   .cubby .c-wall.b{ left:0; right:0; bottom:0; height:var(--wall-depth);
     transform-origin:bottom; transform: rotateX(90deg);
-    background-image: linear-gradient(rgba(255,255,255,.14),rgba(0,0,0,.32)), var(--wood-tex); }
+    background-image: linear-gradient(rgba(0,0,0,.18),rgba(0,0,0,.46)), var(--wood-tex); }
   .cubby .c-wall.l{ top:0; bottom:0; left:0; width:var(--wall-depth);
     transform-origin:left; transform: rotateY(90deg);
-    background-image: linear-gradient(90deg,rgba(0,0,0,.4),rgba(0,0,0,.2)), var(--wood-tex); }
+    background-image: linear-gradient(90deg,rgba(0,0,0,.5),rgba(0,0,0,.16)), var(--wood-tex); }
   .cubby .c-wall.r{ top:0; bottom:0; right:0; width:var(--wall-depth);
     transform-origin:right; transform: rotateY(-90deg);
-    background-image: linear-gradient(90deg,rgba(0,0,0,.22),rgba(0,0,0,.42)), var(--wood-tex); }
-  /* FLOOR = front face where goods sit; the interactive surface */
+    background-image: linear-gradient(90deg,rgba(0,0,0,.16),rgba(0,0,0,.5)), var(--wood-tex); }
+  /* ---- DEPTH SURFACES ----
+     The shelf floor reads as the SURFACE the goods stand on. V3 splits the
+     interior into two stages:
+       .c-back-layer = sits deep in the recess (near the back wall), holds the
+                       HIDDEN back-layer goods that PEEK over the front goods
+                       (smaller, dimmer, higher, deeper Z) — NOT interactive.
+       .c-floor      = the FRONT stage where the big interactive goods stand.
+     Both share the same wooden floor read so goods look firmly grounded. */
+
+  /* The wooden floor of the recess (where goods physically stand). Pushed back
+     a little and laid flat-ish; a long floor that recedes into the box.
+     overflow:visible so the BIG front goods can stand taller than the floor box. */
   .cubby .c-floor{ position:absolute; inset:0; border-radius:9px;
     background:
-      radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.20), rgba(0,0,0,0) 55%),
-      linear-gradient(180deg, #ecd6ab 0%, #e3c690 60%, #d2ad6f 100%);
-    box-shadow: inset 0 7px 12px rgba(0,0,0,.30), inset 0 -3px 6px rgba(255,255,255,.30);
+      radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.18), rgba(0,0,0,0) 55%),
+      linear-gradient(180deg, #ecd6ab 0%, #e3c690 55%, #cba262 100%);
+    box-shadow: inset 0 9px 16px rgba(0,0,0,.34), inset 0 -3px 6px rgba(255,255,255,.28);
     display:flex; align-items:flex-end; justify-content:center;
-    padding:0 4% 6%; gap:2.5%;
+    padding:0 1.5% 3%; gap:1%; overflow:visible;
     transition: box-shadow .12s, background .12s; }
-  .cubby.target-ok .c-floor{ box-shadow: inset 0 0 0 3px #5fd06b, inset 0 7px 12px rgba(0,0,0,.28);
+  .cubby.target-ok .c-floor{ box-shadow: inset 0 0 0 3px #5fd06b, inset 0 9px 16px rgba(0,0,0,.3);
     background:linear-gradient(180deg,#d6f0d2,#e3c690); }
-  .cubby.target-bad .c-floor{ box-shadow: inset 0 0 0 3px #e8453c, inset 0 7px 12px rgba(0,0,0,.28); }
+  .cubby.target-bad .c-floor{ box-shadow: inset 0 0 0 3px #e8453c, inset 0 9px 16px rgba(0,0,0,.3); }
   .cubby.clearing{ animation:cubbyPop .34s ease; }
   @keyframes cubbyPop{ 0%{transform:scale(1);} 30%{transform:scale(1.06);} 100%{transform:scale(1);} }
-  /* good sprite stands inside the cubby. The shelf is tilted rotateX(15deg);
-     we counter-rotate each good (-15deg) about its base so it reads UPRIGHT
-     (billboarded) while still living on the recessed floor. */
-  .good{ position:relative; width:30%; height:76%;
+
+  /* BACK LAYER stage — pushed deep into the recess (toward back wall) and a bit
+     UP, so its goods peek over the tops of the front goods. Holds peeking goods. */
+  .cubby .c-back-layer{ position:absolute; left:0; right:0; bottom:0; height:100%;
+    transform: translateZ(calc(-1 * var(--wall-depth) * 0.62)) translateY(-12%);
+    display:flex; align-items:flex-end; justify-content:center;
+    padding:0 8% 14%; gap:3%; pointer-events:none; }
+
+  /* good sprite stands on the floor. Shelf is tilted rotateX(6deg); each good is
+     counter-rotated (-6deg) about its base so it reads UPRIGHT while standing on
+     the recessed floor. FRONT goods are BIG (fill the cubby) — a generous box
+     plus a front boost scale so 3 goods pack the cubby like the reference. */
+  .good{ position:relative; width:33.3%; height:150%;
     background-size:contain; background-repeat:no-repeat; background-position:center bottom;
-    filter:drop-shadow(0 5px 4px rgba(0,0,0,.34));
-    transform: translateZ(10px) rotateX(-6deg) scale(var(--gs,1));
+    filter:drop-shadow(0 4px 3px rgba(0,0,0,.28));
+    transform: translateZ(14px) rotateX(-6deg) scale(calc(var(--gs,1) * 1.16));
     will-change:transform; transform-origin:center bottom;
     cursor:grab; touch-action:none; }
-  /* a blocked (non-front) good is visibly inert */
-  .good.blocked{ cursor:default; filter:drop-shadow(0 3px 3px rgba(0,0,0,.3)) brightness(.9);
-    transform: translateZ(6px) rotateX(-6deg); }
+  /* CONTACT SHADOW — a soft base ellipse where the good meets the shelf floor,
+     grounding it (not floating). Lives just behind the sprite, on the floor. */
+  .good::after{ content:""; position:absolute; left:50%; bottom:-2%;
+    width:84%; height:15%; transform:translate(-50%,0);
+    background:radial-gradient(closest-side, rgba(0,0,0,.42), rgba(0,0,0,.18) 58%, rgba(0,0,0,0) 80%);
+    border-radius:50%; z-index:-1; pointer-events:none; }
+  /* PEEKING back-layer goods: smaller, dimmer, deeper, and their contact shadow
+     is fainter (they sit further back in the recess). NOT interactive. */
+  .good.peek{ width:25%; height:90%; cursor:default;
+    filter:drop-shadow(0 3px 3px rgba(0,0,0,.34)) brightness(.66) saturate(.85);
+    transform: translateZ(0) rotateX(-6deg) scale(calc(var(--gs,1) * .82)); }
+  .good.peek::after{ background:radial-gradient(closest-side, rgba(0,0,0,.3), rgba(0,0,0,.12) 60%, rgba(0,0,0,0) 80%);
+    height:12%; width:78%; }
+  /* a blocked good (data flag / non-grabbable) is visibly inert but in the FRONT */
+  .good.blocked{ cursor:default; filter:drop-shadow(0 3px 3px rgba(0,0,0,.3)) brightness(.9); }
   .good.dragging{ opacity:0; }
   .good.land{ animation:land .34s cubic-bezier(.34,1.56,.64,1); }
   @keyframes land{
-    0%{ transform:translateZ(10px) rotateX(-6deg) translateY(-26%) scaleY(1.18) scaleX(.86); }
-    45%{ transform:translateZ(10px) rotateX(-6deg) translateY(0) scaleY(.78) scaleX(1.16); }
-    70%{ transform:translateZ(10px) rotateX(-6deg) translateY(0) scaleY(1.08) scaleX(.94); }
-    100%{ transform:translateZ(10px) rotateX(-6deg) translateY(0) scaleY(1) scaleX(1); }
+    0%{ transform:translateZ(14px) rotateX(-6deg) translateY(-26%) scaleY(1.18) scaleX(.86) scale(calc(var(--gs,1) * 1.16)); }
+    45%{ transform:translateZ(14px) rotateX(-6deg) translateY(0) scaleY(.78) scaleX(1.16) scale(calc(var(--gs,1) * 1.16)); }
+    70%{ transform:translateZ(14px) rotateX(-6deg) translateY(0) scaleY(1.08) scaleX(.94) scale(calc(var(--gs,1) * 1.16)); }
+    100%{ transform:translateZ(14px) rotateX(-6deg) translateY(0) scaleY(1) scaleX(1) scale(calc(var(--gs,1) * 1.16)); }
+  }
+  /* REVEAL — when the front layer empties, the back layer slides forward to become
+     the new front: it scales up from the recess + slides toward the viewer, then a
+     little settle. Applied to a cubby's interior wrapper during reveal. */
+  .good.revealing{ animation:revealForward .5s cubic-bezier(.25,1.3,.5,1) both; }
+  @keyframes revealForward{
+    0%{ transform:translateZ(calc(-1 * var(--wall-depth) * 0.62)) rotateX(-6deg) translateY(-12%) scale(calc(var(--gs,1) * .9)); filter:brightness(.66) saturate(.85); opacity:.7; }
+    60%{ transform:translateZ(20px) rotateX(-6deg) translateY(3%) scale(calc(var(--gs,1) * 1.26)); filter:brightness(1.02); opacity:1; }
+    100%{ transform:translateZ(14px) rotateX(-6deg) translateY(0) scale(calc(var(--gs,1) * 1.16)); filter:none; opacity:1; }
   }
   /* drag avatar (floats above board) */
   #drag-ghost{ position:fixed; z-index:60; pointer-events:none; display:none;
@@ -390,6 +446,10 @@
   // =============================================================
   // Embedded copy of stage1.json so the single HTML is self-contained.
   // (Build pipeline / editor can overwrite window.__STAGES; we prefer that.)
+  // V3 DEPTH LAYERS: cubby = { r, c, layers:[ [t,t,t], [t,t,..], .. ] }.
+  // layers[0]=FRONT (visible+interactive); layers behind = hidden goods that peek
+  // and reveal when the front empties. Empty workspace cubbies use layers:[[]].
+  // Backward-compat: a cubby with flat items:[...] = a single front layer.
   var EMBEDDED_STAGES = {
     1: {
       "level": 1, "timeLimit": 120, "cols": 3, "rows": 3, "cellCap": 3,
@@ -397,15 +457,15 @@
       "combo": { "resetAfterMs": 4000 },
       "scoring": { "starsPerSort": 1, "comboBonus": 1 },
       "cubbies": [
-        { "r":0,"c":0,"items":["cola","juice","milk"] },
-        { "r":0,"c":1,"items":["chips","donut","cola"] },
-        { "r":0,"c":2,"items":["juice","milk","chips"] },
-        { "r":1,"c":0,"items":["donut","cola","juice"] },
-        { "r":1,"c":1,"items":["milk","chips","donut"] },
-        { "r":1,"c":2,"items":[] },
-        { "r":2,"c":0,"items":[] },
-        { "r":2,"c":1,"items":[] },
-        { "r":2,"c":2,"items":[] }
+        { "r":0,"c":0,"layers":[ ["cola","juice","milk"], ["chips","donut","cola"] ] },
+        { "r":0,"c":1,"layers":[ ["donut","milk","juice"], ["chips","cola","donut"] ] },
+        { "r":0,"c":2,"layers":[ ["juice","milk","chips"] ] },
+        { "r":1,"c":0,"layers":[ ["milk","donut","cola"], ["juice","chips","milk"] ] },
+        { "r":1,"c":1,"layers":[ ["chips","cola","donut"], ["juice","milk","donut"] ] },
+        { "r":1,"c":2,"layers":[ ["cola","juice","chips"] ] },
+        { "r":2,"c":0,"layers":[ [] ] },
+        { "r":2,"c":1,"layers":[ [] ] },
+        { "r":2,"c":2,"layers":[ [] ] }
       ]
     }
   };
@@ -414,11 +474,19 @@
     // deep clone so replays start fresh
     return JSON.parse(JSON.stringify(src));
   }
+  // normalize a cubby spec to V3 layers form (flat items -> single front layer;
+  // a cubby with no layers/items -> one empty workspace front layer).
+  function normLayers(cb){
+    if (Array.isArray(cb.layers)) return cb.layers.map(function(l){ return (l||[]).slice(); });
+    if (Array.isArray(cb.items))  return [ cb.items.slice() ];
+    return [ [] ];
+  }
 
   // asset path resolver (relative — zippable for host)
   function tileURL(type){ return '../assets/goods/' + type + '_tile.png'; }
-  // per-type display scale so goods read at consistent real-world sizes (bottle bigger than donut)
-  var GOOD_SCALE = { cola:1.0, juice:1.0, milk:0.96, chips:0.82, donut:0.64 };
+  // per-type display scale so goods read at consistent real-world sizes (bottle bigger
+  // than donut). V3: front goods are BIG (fill the cubby) — these scale the .good box.
+  var GOOD_SCALE = { cola:1.0, juice:1.0, milk:1.0, chips:0.94, donut:0.86 };
 
   // =============================================================
   // STATE
@@ -426,7 +494,7 @@
   var S = {
     level: startLevel,
     cfg: null,
-    cubbies: [],        // [{r,c,items:[type...]}]
+    cubbies: [],        // [{r,c,layers:[[type...],...],el,floor,backEl}]  layers[0]=FRONT
     cap: 3,
     timeLeft: 0,
     running: false,
@@ -452,9 +520,10 @@
   // =============================================================
   // BUILD BOARD from data
   // =============================================================
-  // Build the 3D cubby grid. Each cubby = recessed box with 5 wood faces
-  // (back wall + 4 inner side walls = visible depth/thickness) + a front
-  // FLOOR face where the 2D good sprites sit (drag interacts with floor goods).
+  // Build the 3D cubby grid. Each cubby = recessed box with 6 wood faces
+  // (back wall + 4 inner side walls = visible depth/thickness) + a front FLOOR
+  // face where the big interactive front-layer goods stand, plus a BACK-LAYER
+  // stage deep in the recess where hidden goods peek over the front.
   function buildBoard(){
     var cfg = S.cfg;
     S.cap = cfg.cellCap || 3;
@@ -470,78 +539,127 @@
         var el = document.createElement('div');
         el.className = 'cubby';
         el.dataset.idx = cb ? S.cubbies.indexOf(cb) : -1;
-        // 5 recess faces (procedural 3D) + interactive floor
+        // 6 recess faces (procedural 3D) + back-layer stage + interactive front floor
         el.innerHTML =
           '<div class="c-back"></div>' +
           '<div class="c-wall t"></div><div class="c-wall b"></div>' +
           '<div class="c-wall l"></div><div class="c-wall r"></div>' +
+          '<div class="c-back-layer"></div>' +
           '<div class="c-floor"></div>';
-        if (cb){ cb.el = el; cb.floor = el.querySelector('.c-floor'); }
+        if (cb){ cb.el = el; cb.floor = el.querySelector('.c-floor'); cb.backEl = el.querySelector('.c-back-layer'); }
         gridEl.appendChild(el);
       }
     }
     renderAllCubbies();
   }
 
-  function renderCubby(cb){
-    var floor = cb.floor; if (!floor) return;
-    floor.innerHTML = '';
+  // ---- LAYER ACCESSORS (single source of truth for the depth model) ----
+  function frontLayer(cb){ return (cb.layers && cb.layers.length) ? cb.layers[0] : null; }
+  function backLayer(cb){ return (cb.layers && cb.layers.length > 1) ? cb.layers[1] : null; }
+
+  // Render one cubby: the FRONT layer's goods stand BIG on the floor (interactive),
+  // and (if present) the NEXT layer's goods PEEK over the top from deep in the recess
+  // (smaller, dimmer, deeper Z, NOT interactive).
+  function renderCubby(cb, opts){
+    opts = opts || {};
     var idx = S.cubbies.indexOf(cb);
-    var lastIdx = cb.items.length - 1;   // rightmost = front-most = grabbable
-    for (var i=0; i<cb.items.length; i++){
-      var g = document.createElement('div');
-      g.className = 'good';
-      g.style.backgroundImage = 'url("' + tileURL(cb.items[i]) + '")';
-      g.dataset.type = cb.items[i];
-      g.style.setProperty('--gs', GOOD_SCALE[cb.items[i]] || 1);
-      g.dataset.cubby = idx;
-      g.dataset.slot = i;
-      // GRAB RULE: only the front-most (rightmost) good is grabbable;
-      // every good behind it is blocked until the front one is removed.
-      if (i !== lastIdx) g.classList.add('blocked');
-      floor.appendChild(g);
+    var front = frontLayer(cb) || [];
+    var back  = backLayer(cb) || [];
+
+    // FRONT goods (interactive)
+    if (cb.floor){
+      cb.floor.innerHTML = '';
+      for (var i=0; i<front.length; i++){
+        var g = document.createElement('div');
+        g.className = 'good';
+        g.style.backgroundImage = 'url("' + tileURL(front[i]) + '")';
+        g.dataset.type = front[i];
+        g.style.setProperty('--gs', GOOD_SCALE[front[i]] || 1);
+        g.dataset.cubby = idx;
+        g.dataset.slot = i;
+        g.dataset.layer = '0';
+        // V3 GRAB RULE: every good in the FRONT layer is grabbable.
+        // (locked cubbies, a future data flag, mark all front goods blocked.)
+        if (cb.locked) g.classList.add('blocked');
+        // reveal animation: goods that just slid forward from the back layer
+        if (opts.reveal){
+          g.classList.add('revealing');
+          (function(gg){ gg.addEventListener('animationend', function(){ gg.classList.remove('revealing'); }, { once:true }); })(g);
+        }
+        cb.floor.appendChild(g);
+      }
+    }
+    // BACK-LAYER goods (peeking, non-interactive)
+    if (cb.backEl){
+      cb.backEl.innerHTML = '';
+      for (var j=0; j<back.length; j++){
+        var b = document.createElement('div');
+        b.className = 'good peek';
+        b.style.backgroundImage = 'url("' + tileURL(back[j]) + '")';
+        b.dataset.type = back[j];
+        b.style.setProperty('--gs', GOOD_SCALE[back[j]] || 1);
+        b.dataset.cubby = idx;
+        b.dataset.slot = j;
+        b.dataset.layer = '1';      // behind the front -> not grabbable
+        cb.backEl.appendChild(b);
+      }
     }
   }
-  function renderAllCubbies(){ S.cubbies.forEach(renderCubby); }
+  function renderAllCubbies(){ S.cubbies.forEach(function(cb){ renderCubby(cb); }); }
 
   // =============================================================
   // RULES
   // =============================================================
-  // GRAB RULE — the front-most (rightmost) good is the grabbable one.
-  // Goods behind it are blocked (not draggable) until it's removed.
-  // (data-flag ready: future per-good obstacles can veto via cb.locked etc.)
-  function frontGoodEl(cb){
-    var els = cb.floor ? cb.floor.querySelectorAll('.good') : [];
-    return els.length ? els[els.length-1] : null;
-  }
+  // V3 GRAB RULE — every good in the FRONT layer (layers[0]) is grabbable.
+  // Goods in BACK layers (.peek, dataset.layer!=='0') are NOT grabbable until
+  // revealed. (cb.locked, a future data flag, blocks the whole front layer.)
   function isGrabbable(cb, goodEl){
     if (!cb || !goodEl) return false;
     if (cb.locked) return false;                        // future data flag
-    return goodEl === frontGoodEl(cb);                  // only the front-most
+    if (goodEl.dataset.layer !== '0') return false;     // only FRONT-layer goods
+    // must still be a member of the front floor (not a peeking back good)
+    return !!(cb.floor && cb.floor.contains(goodEl) && !goodEl.classList.contains('peek'));
   }
-  // DROP RULE (V2) — a good drops into ANY cubby that has FREE SPACE,
-  // regardless of type. Free sort: mix allowed; you rearrange until a
-  // cubby holds 3 IDENTICAL goods (then it clears). No same-type gate.
+  // V3 DROP RULE — a good drops into the target cubby's FRONT layer if it has
+  // FREE SPACE (< cap), regardless of type (keep V2 free-sort). If the front
+  // layer is full (=== cap) the drop is rejected.
   function canDrop(fromCb, toCb, type){
     if (fromCb === toCb) return false;
     if (toCb.locked) return false;                      // future data flag
-    return toCb.items.length < S.cap;                   // free space iff < cap
+    var tf = frontLayer(toCb);
+    if (!tf) return false;                              // no front layer to receive
+    return tf.length < S.cap;                           // free space iff < cap
   }
 
-  // perform a move (data + render) ; returns true if cleared
+  // REVEAL — if a cubby's FRONT layer is empty AND a back layer exists, remove the
+  // empty front and let the next layer SLIDE FORWARD to become the new front (with
+  // a reveal animation). If no back layer exists, the empty front stays as a free
+  // workspace slot. Returns true if a reveal actually happened.
+  function maybeReveal(cb){
+    var front = frontLayer(cb);
+    if (front && front.length === 0 && cb.layers.length > 1){
+      cb.layers.shift();                                // drop empty front; next becomes front
+      renderCubby(cb, { reveal:true });                 // animate the new front sliding forward
+      return true;
+    }
+    return false;
+  }
+
+  // perform a move (data + render) ; returns true if a CLEAR happened
   function doMove(fromIdx, toIdx){
     var fromCb = S.cubbies[fromIdx], toCb = S.cubbies[toIdx];
     if (!fromCb || !toCb) return false;
-    if (!fromCb.items.length) return false;
-    var type = fromCb.items[fromCb.items.length-1];
+    var ff = frontLayer(fromCb);
+    if (!ff || !ff.length) return false;
+    var type = ff[ff.length-1];
     if (!canDrop(fromCb, toCb, type)) return false;
 
-    fromCb.items.pop();
-    toCb.items.push(type);
-    renderCubby(fromCb);
+    var tf = frontLayer(toCb);
+    ff.pop();
+    tf.push(type);
     renderCubby(toCb);
 
-    // squash-bounce on the landed good (last one in target)
+    // squash-bounce on the landed good (last one in target front layer)
     var landed = toCb.floor ? toCb.floor.querySelectorAll('.good') : [];
     if (landed.length){
       var lg = landed[landed.length-1];
@@ -550,11 +668,16 @@
     }
     haptic('place');
 
-    // check clear: cap identical
-    if (toCb.items.length === S.cap && allSame(toCb.items)){
-      clearCubby(toCb);
+    // check clear: front layer full of identical goods
+    if (tf.length === S.cap && allSame(tf)){
+      clearCubby(toCb);                                 // clears + reveals toCb's back layer (if any)
+      // source front may now be empty -> reveal its back layer too
+      renderCubby(fromCb); maybeReveal(fromCb);
       return true;
     }
+    // no clear: re-render source; if its front emptied, reveal next layer
+    renderCubby(fromCb);
+    maybeReveal(fromCb);
     return false;
   }
   function allSame(arr){ for (var i=1;i<arr.length;i++){ if(arr[i]!==arr[0]) return false; } return arr.length>0; }
@@ -587,7 +710,7 @@
     }
     haptic('clear');
 
-    // remove items (data) — visual goods vanish with a quick pop
+    // pop the current front goods visually (quick scale-out)
     if (cb.floor){
       var goods = cb.floor.querySelectorAll('.good');
       goods.forEach(function(g){
@@ -596,8 +719,18 @@
         g.style.opacity = '0';
       });
     }
-    cb.items = [];
-    setTimeout(function(){ renderCubby(cb); checkWin(); }, 200);
+    // DATA is updated SYNCHRONOUSLY (single source of truth): empty the front layer,
+    // then if a back layer exists drop the empty front so the back becomes the new
+    // front immediately. This keeps totalGoods()/win-check/solver consistent without
+    // waiting on animation. The visual pop + reveal slide are deferred (cosmetic only).
+    var f = frontLayer(cb); if (f) f.length = 0;        // empty the FRONT layer (data)
+    var willReveal = (cb.layers.length > 1);
+    if (willReveal) cb.layers.shift();                  // back layer -> front (data, now)
+    setTimeout(function(){
+      // re-render after the pop: if a back layer slid up, animate the reveal.
+      renderCubby(cb, willReveal ? { reveal:true } : {});
+      checkWin();
+    }, 200);
   }
 
   // combo logic ----------------------------------------------
@@ -802,9 +935,17 @@
     if (S.timeLeft < 30) timerEl.classList.add('warn'); else timerEl.classList.remove('warn');
   }
 
-  function totalGoods(){ var n=0; S.cubbies.forEach(function(cb){ n+=cb.items.length; }); return n; }
+  // V3: count goods across ALL layers of all cubbies (front + every hidden back layer).
+  function totalGoods(){
+    var n=0;
+    S.cubbies.forEach(function(cb){
+      if (cb.layers) cb.layers.forEach(function(l){ n += l.length; });
+    });
+    return n;
+  }
   function checkWin(){
     if (S.over) return;
+    // WIN only when every layer of every cubby is empty.
     if (totalGoods() === 0){ win(); }
   }
   function win(){
@@ -882,7 +1023,11 @@
   function startLevelFn(level){
     S.level = level;
     S.cfg = loadStage(level);
-    S.cubbies = S.cfg.cubbies.map(function(cb){ return { r:cb.r, c:cb.c, items:cb.items.slice(), el:null }; });
+    // V3: build per-cubby LAYER stacks (normLayers handles both layers:[...] and
+    // legacy flat items:[...]). layers[0]=FRONT (interactive), rest=hidden/peeking.
+    S.cubbies = S.cfg.cubbies.map(function(cb){
+      return { r:cb.r, c:cb.c, layers: normLayers(cb), locked: !!cb.locked, el:null, floor:null, backEl:null };
+    });
     S.cap = S.cfg.cellCap || 3;
     S.timeLeft = S.cfg.timeLimit || 120;
     S.stars = 0; S.combo = 1; S.over = false; S.paused = false; S.running = true;
@@ -962,43 +1107,108 @@
       over:S.over, running:S.running, paused:S.paused, reels:REELS,
       total: totalGoods()
     }; },
-    board: function(){ return S.cubbies.map(function(cb){ return { r:cb.r, c:cb.c, items:cb.items.slice() }; }); },
+    // V3: expose full layer stacks (front=layers[0]) + a convenience `front`.
+    board: function(){ return S.cubbies.map(function(cb){
+      return { r:cb.r, c:cb.c,
+        layers: (cb.layers||[]).map(function(l){ return l.slice(); }),
+        front: (frontLayer(cb)||[]).slice(),
+        layerCount: (cb.layers||[]).length };
+    }); },
     // drive a move deterministically (returns true if a cubby cleared)
     move: function(fromIdx, toIdx){ return doMove(fromIdx, toIdx); },
-    // --- V2 rule probes (for headless verify) ---
-    // DROP RULE: can a top good from fromIdx be dropped into toIdx? (free space, any type)
+    // --- rule probes (for headless verify) ---
+    // DROP RULE: can the top FRONT-layer good from fromIdx drop into toIdx? (free space, any type)
     canDrop: function(fromIdx, toIdx){
       var fr = S.cubbies[fromIdx], to = S.cubbies[toIdx];
-      if (!fr || !to || !fr.items.length) return false;
-      return canDrop(fr, to, fr.items[fr.items.length-1]);
+      if (!fr || !to) return false;
+      var ff = frontLayer(fr); if (!ff || !ff.length) return false;
+      return canDrop(fr, to, ff[ff.length-1]);
     },
-    // GRAB RULE: is the good at (cubbyIdx, slot) grabbable? (front-most only)
+    // GRAB RULE: is the FRONT-floor good at slot grabbable? (every front good is)
     canGrab: function(cubbyIdx, slot){
       var cb = S.cubbies[cubbyIdx]; if (!cb || !cb.floor) return false;
       var goods = cb.floor.querySelectorAll('.good');
       var g = goods[slot]; if (!g) return false;
       return isGrabbable(cb, g);
     },
-    // does the (front) good at slot carry the .blocked class? (true = not front)
+    // GRAB RULE (back layer): is the peeking back-layer good at slot grabbable? (must be false)
+    canGrabBack: function(cubbyIdx, slot){
+      var cb = S.cubbies[cubbyIdx]; if (!cb || !cb.backEl) return false;
+      var g = cb.backEl.querySelectorAll('.good')[slot]; if (!g) return false;
+      return isGrabbable(cb, g);
+    },
+    // Drive startDrag against a back-layer good and report whether a drag began.
+    // V3 assert: a back good must REJECT startDrag (no drag avatar appears).
+    tryStartDragBack: function(cubbyIdx, slot){
+      var cb = S.cubbies[cubbyIdx]; if (!cb || !cb.backEl) return { started:false, reason:'no-back' };
+      var g = cb.backEl.querySelectorAll('.good')[slot]; if (!g) return { started:false, reason:'no-good' };
+      var rect = g.getBoundingClientRect();
+      startDrag(g, rect.left+rect.width/2, rect.top+rect.height/2);
+      var started = (ghostEl.style.display === 'block');
+      if (started){ endDrag(rect.left+rect.width/2, rect.top+rect.height/2); } // clean up if it (wrongly) started
+      return { started: started };
+    },
+    // Drive startDrag against a FRONT-layer good; report whether a drag began.
+    tryStartDragFront: function(cubbyIdx, slot){
+      var cb = S.cubbies[cubbyIdx]; if (!cb || !cb.floor) return { started:false, reason:'no-floor' };
+      var g = cb.floor.querySelectorAll('.good')[slot]; if (!g) return { started:false, reason:'no-good' };
+      var rect = g.getBoundingClientRect();
+      startDrag(g, rect.left+rect.width/2, rect.top+rect.height/2);
+      var started = (ghostEl.style.display === 'block');
+      if (started){ // cancel cleanly (don't actually move)
+        clearTargetHL(); ghostEl.style.display='none';
+        if (drag && drag.el) drag.el.classList.remove('dragging');
+        renderCubby(cb); drag=null;
+      }
+      return { started: started };
+    },
+    // how many layers does cubby have, and how many goods peek in the back stage?
+    layerInfo: function(cubbyIdx){
+      var cb = S.cubbies[cubbyIdx]; if (!cb) return null;
+      return {
+        layerCount: (cb.layers||[]).length,
+        frontLen: (frontLayer(cb)||[]).length,
+        backLen: (backLayer(cb)||[]).length,
+        peekDOM: cb.backEl ? cb.backEl.querySelectorAll('.good.peek').length : 0,
+        frontDOM: cb.floor ? cb.floor.querySelectorAll('.good').length : 0
+      };
+    },
+    // does the front good at slot carry .blocked (locked cubby flag)? null if absent
     isBlockedDOM: function(cubbyIdx, slot){
       var cb = S.cubbies[cubbyIdx]; if (!cb || !cb.floor) return null;
       var g = cb.floor.querySelectorAll('.good')[slot];
       return g ? g.classList.contains('blocked') : null;
     },
-    // 3D shelf presence: CSS-3D faces + DOM goods on floors
+    // does a contact-shadow render under goods? (CSS ::after pseudo on .good)
+    hasContactShadow: function(cubbyIdx, slot){
+      var cb = S.cubbies[cubbyIdx]; if (!cb || !cb.floor) return null;
+      var g = cb.floor.querySelectorAll('.good')[slot]; if (!g) return null;
+      var cs = getComputedStyle(g, '::after');
+      // present if the ::after exists with content '""' and a non-zero box
+      var content = cs.getPropertyValue('content');
+      var w = parseFloat(cs.getPropertyValue('width')) || 0;
+      var bg = cs.getPropertyValue('background-image') || cs.getPropertyValue('background');
+      return { present: (content !== 'none' && content !== ''), width:w, hasGradient: /gradient/.test(bg) };
+    },
+    // 3D shelf presence: CSS-3D faces + DOM goods on floors + back-layer stages
     shelf3d: function(){
       var sh = document.getElementById('shelf');
       var st = sh ? getComputedStyle(sh) : null;
+      var wd = getComputedStyle(document.documentElement).getPropertyValue('--wall-depth').trim();
       return {
         kind: 'css3d',
         threeCanvas: !!document.querySelector('#shelf canvas, #board-wrap canvas'),
         preserve3d: st ? (st.transformStyle === 'preserve-3d') : false,
         perspective: getComputedStyle(document.getElementById('board-wrap')).perspective,
+        wallDepth: wd,
+        wallDepthPx: parseFloat(wd) || 0,
         cubbies: document.querySelectorAll('#grid .cubby').length,
         backWalls: document.querySelectorAll('#grid .cubby .c-back').length,
         sideWalls: document.querySelectorAll('#grid .cubby .c-wall').length,
         floors: document.querySelectorAll('#grid .cubby .c-floor').length,
-        goodsInFloors: document.querySelectorAll('#grid .cubby .c-floor .good').length
+        backLayers: document.querySelectorAll('#grid .cubby .c-back-layer').length,
+        goodsInFloors: document.querySelectorAll('#grid .cubby .c-floor .good').length,
+        peekGoods: document.querySelectorAll('#grid .cubby .c-back-layer .good.peek').length
       };
     },
     stars: function(){ return S.stars; },
@@ -1009,47 +1219,73 @@
     shouldEmitGameEnd: shouldEmitGameEnd,
     safeTop: function(){ return getComputedStyle(document.documentElement).getPropertyValue('--safe-top').trim(); },
     win: function(){ win(); },
-    // find a sequence of moves to win, then execute (greedy solver for verify)
+    // find a winning move sequence, then EXECUTE it on the live board (so effects +
+    // haptics still fire). Solving runs on a CLONED layer model via bounded DFS with
+    // memoization — robust for the "any-free-slot" layered sort (decoupled from UI).
     autoSolve: function(maxSteps){
-      maxSteps = maxSteps || 200;
+      maxSteps = maxSteps || 600;
+      var cap = S.cap;
+      // ---- pure model over layer-stacks (mirror of doMove/maybeReveal/clear) ----
+      function clone(){ return S.cubbies.map(function(cb){ return (cb.layers||[]).map(function(l){return l.slice();}); }); }
+      function mFront(st,i){ return st[i].length? st[i][0] : null; }
+      function mReveal(st,i){ while(st[i].length>1 && st[i][0].length===0) st[i].shift(); }
+      function mAllSame(a){ for(var k=1;k<a.length;k++) if(a[k]!==a[0]) return false; return a.length>0; }
+      function mTotal(st){ var n=0; for(var i=0;i<st.length;i++) for(var j=0;j<st[i].length;j++) n+=st[i][j].length; return n; }
+      function mMove(st,f,t){ // returns new cloned state or null if illegal
+        var ff=mFront(st,f), tf=mFront(st,t);
+        if(!ff || ff.length===0) return null;
+        if(!tf) return null;
+        if(tf.length>=cap) return null;
+        if(f===t) return null;
+        var ns = st.map(function(c){ return c.map(function(l){return l.slice();}); });
+        var nff=ns[f][0], ntf=ns[t][0];
+        var g = nff.pop(); ntf.push(g);
+        if(ntf.length===cap && mAllSame(ntf)){ ntf.length=0; }
+        mReveal(ns,f); mReveal(ns,t);
+        return ns;
+      }
+      function key(st){ return st.map(function(c){ return c.map(function(l){return l.join(',');}).join('|'); }).join(';'); }
+      // candidate moves from a state (ordered: completing > gathering > dumping)
+      function moves(st){
+        var n=st.length, out=[];
+        function pushIf(f,t,pri){ var ns=mMove(st,f,t); if(ns){ out.push({f:f,t:t,pri:pri,ns:ns}); } }
+        for(var f=0;f<n;f++){ var top=mFront(st,f); if(top===null||!st[f][0].length) continue;
+          var tp=st[f][0][st[f][0].length-1];
+          for(var t=0;t<n;t++){ if(t===f) continue; var tf=mFront(st,t); if(!tf) continue;
+            var pri;
+            if(tf.length===cap-1 && mAllSame(tf) && tf[0]===tp) pri=0;          // completes
+            else if(tf.length>0 && tf.length<cap && mAllSame(tf) && tf[0]===tp) pri=1; // gathers
+            else if(tf.length===0) pri=2;                                       // dump to empty
+            else continue;                                                      // skip mixing onto mixed
+            pushIf(f,t,pri);
+          }
+        }
+        out.sort(function(a,b){ return a.pri-b.pri; });
+        return out;
+      }
+      // bounded DFS for a winning sequence
+      var seen = {};
+      var path = null;
+      var nodeBudget = 60000;
+      function dfs(st, acc){
+        if(nodeBudget-- <= 0) return false;
+        if(mTotal(st)===0){ path = acc.slice(); return true; }
+        var k = key(st); if(seen[k]) return false; seen[k]=1;
+        if(acc.length>maxSteps) return false;
+        var ms = moves(st);
+        for(var i=0;i<ms.length;i++){
+          acc.push([ms[i].f, ms[i].t]);
+          if(dfs(ms[i].ns, acc)) return true;
+          acc.pop();
+        }
+        return false;
+      }
+      var solved = dfs(clone(), []);
       var steps = 0;
-      function findMove(){
-        // 1) try to complete: move a good onto a cubby that has 2 of same type
-        for (var t=0;t<S.cubbies.length;t++){
-          var to = S.cubbies[t];
-          if (to.items.length>0 && to.items.length<S.cap && allSame(to.items)){
-            for (var f=0;f<S.cubbies.length;f++){
-              if (f===t) continue;
-              var fr = S.cubbies[f];
-              if (fr.items.length && fr.items[fr.items.length-1]===to.items[0] && canDrop(fr,to,to.items[0]))
-                return [f,t];
-            }
-          }
-        }
-        // 2) consolidate: move a top good onto a cubby (empty or same) to gather
-        for (var f2=0;f2<S.cubbies.length;f2++){
-          var fr2 = S.cubbies[f2]; if(!fr2.items.length) continue;
-          var typ = fr2.items[fr2.items.length-1];
-          // prefer a target already holding same type (not full)
-          var bestEmpty=-1;
-          for (var t2=0;t2<S.cubbies.length;t2++){
-            if (t2===f2) continue;
-            var to2=S.cubbies[t2];
-            if (to2.items.length && to2.items.length<S.cap && to2.items[0]===typ && allSame(to2.items)) return [f2,t2];
-            if (to2.items.length===0 && bestEmpty<0) bestEmpty=t2;
-          }
-          // spread to empty only if source is mixed (avoid loops)
-          if (bestEmpty>=0 && !allSame(fr2.items)) return [f2,bestEmpty];
-        }
-        return null;
+      if(solved && path){
+        for(var s=0;s<path.length && totalGoods()>0;s++){ doMove(path[s][0], path[s][1]); steps++; }
       }
-      while (steps<maxSteps && totalGoods()>0){
-        var mv = findMove();
-        if (!mv) break;
-        doMove(mv[0], mv[1]);
-        steps++;
-      }
-      return { steps:steps, remaining:totalGoods(), won:totalGoods()===0 };
+      return { steps:steps, remaining:totalGoods(), won:totalGoods()===0, solvedPlan: !!solved };
     }
   };
   window.__ready = true;
