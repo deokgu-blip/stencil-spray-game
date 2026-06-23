@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>물건 정리 / Goods Sort</title>
+<style>
+  /* ============================================================
+     LAYOUT — mobile PORTRAIT, viewport-driven, no fixed design box.
+     --safe-top : honored by HUD; set to 0 in reels mode.
+     ============================================================ */
+  :root{
+    --safe-top: env(safe-area-inset-top, 0px);
+    --wood-dark:#6b4a2b; --wood:#8a5e34; --wood-lite:#a9763f;
+    --beige:#f3e2c7; --beige-d:#e6cfa6;
+    --shelf:#caa06a; --shelf-d:#a67c44;
+    --hud:#2c1c0e; --gold:#ffcf3f; --gold-d:#f1a91d;
+    --green:#3fb24a; --green-d:#2e8a37; --red:#e8453c;
+    --cubby-bg:#ead2a8; --cubby-edge:#c79b5e; --cubby-hole:#b98d50;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; height:100%; overflow:hidden;
+    background:#3a2614; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+    touch-action:none; user-select:none; -webkit-user-select:none; }
+  /* full-viewport background so any ratio is filled (L12) */
+  #bg{ position:fixed; inset:0; z-index:0;
+    background:
+      radial-gradient(120% 80% at 50% -10%, #6b4a2b 0%, #4a3018 55%, #2f1d0d 100%);
+    transition:filter .3s ease; }
+  body.dim #bg{ filter:brightness(.45) saturate(.8); }
+
+  #game{ position:fixed; inset:0; z-index:1; display:flex; flex-direction:column;
+    align-items:center; }
+
+  /* ---------------- HUD ---------------- */
+  #hud{ width:100%; max-width:560px; padding:calc(var(--safe-top) + 10px) 14px 4px;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:8px; z-index:5; }
+  .hud-chip{ background:linear-gradient(#fff7e6,#f0dcb6); color:var(--hud);
+    border:2px solid #fff; border-radius:14px; padding:6px 12px;
+    box-shadow:0 3px 0 rgba(0,0,0,.25); font-weight:800; font-size:15px;
+    display:flex; align-items:center; gap:6px; line-height:1; }
+  .hud-col{ display:flex; flex-direction:column; align-items:center; gap:5px; }
+  #lv{ }
+  #timer{ font-variant-numeric:tabular-nums; font-size:20px; padding:7px 16px;
+    background:linear-gradient(#fff7e6,#ffe7b0); }
+  #timer.warn{ color:#fff; background:linear-gradient(var(--red),#c5342c);
+    border-color:#ffd0cc; animation:tpulse .8s ease-in-out infinite; }
+  @keyframes tpulse{ 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.07);} }
+  #combo{ background:linear-gradient(var(--green),var(--green-d)); color:#fff;
+    border-color:#bff0c4; font-size:13px; padding:5px 12px; border-radius:12px;
+    box-shadow:0 3px 0 rgba(0,0,0,.25); opacity:0; transform:translateY(-4px) scale(.85);
+    transition:opacity .18s, transform .18s; pointer-events:none; }
+  #combo.show{ opacity:1; transform:translateY(0) scale(1); }
+  #combo.bump{ animation:cbump .3s ease; }
+  @keyframes cbump{ 0%{transform:scale(1);} 35%{transform:scale(1.35);} 100%{transform:scale(1);} }
+  #stars{ }
+  #star-icon{ font-size:18px; filter:drop-shadow(0 1px 0 rgba(0,0,0,.2)); }
+  #pause{ cursor:pointer; padding:6px 11px; }
+
+  /* ---------------- BOARD ---------------- */
+  #board-wrap{ flex:1; width:100%; display:flex; align-items:center; justify-content:center;
+    padding:6px 14px 24px; min-height:0; }
+  #shelf{ position:relative; width:min(94vw, 70vh, 520px); aspect-ratio:1/1;
+    background:linear-gradient(#a9763f,#8a5e34);
+    border:6px solid var(--wood-dark); border-radius:22px;
+    box-shadow:0 12px 30px rgba(0,0,0,.45), inset 0 2px 0 rgba(255,255,255,.18);
+    padding:14px; display:grid; gap:12px; }
+  /* cubby */
+  .cubby{ position:relative; background:
+      linear-gradient(180deg, #d9b988 0%, #e7cfa1 14%, #e7cfa1 86%, #c89e63 100%);
+    border:2px solid var(--cubby-edge); border-radius:12px;
+    box-shadow: inset 0 6px 10px rgba(0,0,0,.18), inset 0 -3px 6px rgba(255,255,255,.25);
+    display:flex; align-items:center; justify-content:flex-start;
+    padding:0 4%; gap:3%; transition:box-shadow .12s, background .12s; }
+  .cubby.target-ok{ box-shadow: inset 0 0 0 3px #5fd06b, inset 0 6px 10px rgba(0,0,0,.18);
+    background:linear-gradient(180deg,#d6f0d2,#e7cfa1); }
+  .cubby.target-bad{ box-shadow: inset 0 0 0 3px #e8453c, inset 0 6px 10px rgba(0,0,0,.18); }
+  .cubby.clearing{ animation:cubbyPop .34s ease; }
+  @keyframes cubbyPop{ 0%{transform:scale(1);} 30%{transform:scale(1.08);} 100%{transform:scale(1);} }
+  /* good slot — width is 1/3 of cubby inner, left aligned */
+  .good{ position:relative; width:31%; aspect-ratio:1/1;
+    background-size:contain; background-repeat:no-repeat; background-position:center bottom;
+    filter:drop-shadow(0 4px 3px rgba(0,0,0,.28));
+    will-change:transform; transform-origin:center bottom;
+    transition:transform .06s; cursor:grab; touch-action:none; }
+  .good.dragging{ opacity:0; }
+  .good.land{ animation:land .34s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes land{
+    0%{ transform:translateY(-26%) scaleY(1.18) scaleX(.86); }
+    45%{ transform:translateY(0) scaleY(.78) scaleX(1.16); }
+    70%{ transform:translateY(0) scaleY(1.08) scaleX(.94); }
+    100%{ transform:translateY(0) scaleY(1) scaleX(1); }
+  }
+  /* drag avatar (floats above board) */
+  #drag-ghost{ position:fixed; z-index:60; pointer-events:none; display:none;
+    background-size:contain; background-repeat:no-repeat; background-position:center;
+    filter:drop-shadow(0 8px 6px rgba(0,0,0,.4)); transform:translate(-50%,-50%) scale(1.12); }
+
+  /* ---------------- EFFECT LAYERS ---------------- */
+  #fx{ position:fixed; inset:0; z-index:40; pointer-events:none; overflow:hidden; }
+  .fly-star{ position:fixed; z-index:55; width:34px; height:34px; pointer-events:none;
+    background:radial-gradient(circle at 38% 32%, #fff 0%, #ffe681 30%, #ffce2e 60%, #f59e0b 100%);
+    clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+    filter:drop-shadow(0 0 6px rgba(255,200,40,.9)); will-change:transform,opacity; }
+  .praise{ position:fixed; z-index:56; pointer-events:none; transform:translate(-50%,-50%);
+    font-weight:900; font-size:26px; letter-spacing:-.5px; white-space:nowrap;
+    color:#fff; -webkit-text-stroke:3px var(--gold-d); paint-order:stroke fill;
+    text-shadow:0 3px 0 rgba(0,0,0,.25); }
+  .praise b{ -webkit-text-stroke:3px #c0392b; }
+  .praise.t3{ -webkit-text-stroke:3px #2e8a37; }
+  .praise.t5{ -webkit-text-stroke:3px #7a3fb2; }
+  .praise.tperf{ -webkit-text-stroke:3px #2b6fd8; font-size:30px; }
+  @keyframes praisePop{
+    0%{ transform:translate(-50%,-50%) scale(.3); opacity:0; }
+    25%{ transform:translate(-50%,-62%) scale(1.25); opacity:1; }
+    45%{ transform:translate(-50%,-60%) scale(.95); }
+    70%{ transform:translate(-50%,-66%) scale(1.05); opacity:1; }
+    100%{ transform:translate(-50%,-92%) scale(.9); opacity:0; }
+  }
+  .spark-ring{ position:fixed; z-index:54; pointer-events:none; transform:translate(-50%,-50%);
+    width:18px; height:18px; border-radius:50%; border:4px solid #fff3b0;
+    box-shadow:0 0 12px 3px rgba(255,225,120,.8); opacity:.9; }
+  @keyframes ring{ 0%{ transform:translate(-50%,-50%) scale(.2); opacity:.95; }
+    100%{ transform:translate(-50%,-50%) scale(5.2); opacity:0; } }
+  .sparkle{ position:fixed; z-index:54; pointer-events:none; width:8px; height:8px; border-radius:50%;
+    background:radial-gradient(circle,#fff,#ffd84a); box-shadow:0 0 6px #ffd84a; }
+
+  /* ---------------- RESULT POPUP ---------------- */
+  #overlay{ position:fixed; inset:0; z-index:100; display:none;
+    align-items:center; justify-content:center; padding:24px; }
+  #overlay.on{ display:flex; }
+  .popup{ width:min(86vw,360px); background:linear-gradient(#fff8ea,#ffe9c0);
+    border:4px solid #fff; border-radius:26px; padding:26px 22px 22px; text-align:center;
+    box-shadow:0 18px 50px rgba(0,0,0,.5); animation:popIn .4s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes popIn{ 0%{transform:scale(.6); opacity:0;} 100%{transform:scale(1); opacity:1;} }
+  .popup h2{ margin:0 0 6px; font-size:30px; color:var(--hud);
+    -webkit-text-stroke:0; text-shadow:0 2px 0 #fff; }
+  .popup .sub{ font-size:15px; color:#7a5a32; margin-bottom:14px; }
+  .pstars{ font-size:40px; margin:6px 0 14px; filter:drop-shadow(0 3px 0 rgba(0,0,0,.15)); }
+  .btn{ display:inline-block; margin-top:6px; padding:14px 30px; border-radius:18px;
+    font-weight:900; font-size:19px; color:#fff; cursor:pointer; border:3px solid #fff;
+    box-shadow:0 5px 0 rgba(0,0,0,.25); }
+  .btn.next{ background:linear-gradient(var(--green),var(--green-d)); }
+  .btn.retry{ background:linear-gradient(#ff8c3a,#e8682a); }
+  .btn:active{ transform:translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,.25); }
+
+  /* pause overlay */
+  #pauseScreen{ position:fixed; inset:0; z-index:90; display:none;
+    align-items:center; justify-content:center; }
+  #pauseScreen.on{ display:flex; }
+  #pauseScreen .popup h2{ font-size:26px; }
+
+  /* dev nav */
+  #devnav{ position:fixed; left:0; right:0; bottom:0; z-index:120; display:none;
+    justify-content:center; gap:10px; padding:8px; }
+  #devnav.on{ display:flex; }
+  #devnav button{ background:#222; color:#fff; border:1px solid #555; border-radius:8px;
+    padding:8px 14px; font-weight:700; }
+
+  /* reels mode: zero safe-top */
+  body.reels{ --safe-top:0px; }
+</style>
+</head>
+<body>
+<div id="bg"></div>
+
+<div id="game">
+  <div id="hud">
+    <div class="hud-chip" id="lv">Lv <span id="lvNum">1</span></div>
+    <div class="hud-col">
+      <div class="hud-chip" id="timer">02:00</div>
+      <div class="hud-chip" id="combo">굿즈 x1</div>
+    </div>
+    <div class="hud-col">
+      <div class="hud-chip" id="stars"><span id="star-icon">★</span><span id="starNum">0</span></div>
+      <div class="hud-chip" id="pause">⏸</div>
+    </div>
+  </div>
+
+  <div id="board-wrap">
+    <div id="shelf"></div>
+  </div>
+</div>
+
+<div id="fx"></div>
+<div id="drag-ghost"></div>
+
+<div id="overlay"><div class="popup" id="popupBox"></div></div>
+<div id="pauseScreen"><div class="popup">
+  <h2>일시정지</h2>
+  <div class="sub">계속하려면 누르세요</div>
+  <div class="btn next" id="resumeBtn">계속하기</div>
+</div></div>
+
+<div id="devnav">
+  <button id="devPrev">◀ Prev</button>
+  <button id="devNext">Next ▶</button>
+</div>
+
+<script>
+/* =================================================================
+   GameReels host bridge — GLOBAL (window.__GR) to avoid scope trap.
+   Events + Haptics share the channel but are conceptually separate.
+   ================================================================= */
+(function(){
+  var URLP = new URLSearchParams(location.search);
+  var REELS = URLP.has('reels') || URLP.has('gamereels');
+  var DEV   = URLP.has('dev');
+  var FROM  = parseInt(URLP.get('from'),10); if(!(FROM>=1)) FROM = 1;
+  var TO    = parseInt(URLP.get('to'),10);   if(!(TO>=1))   TO = null;
+
+  // single channel post (event-message) — FLAT {event,data}
+  function postMsg(event, data){
+    var msg = { event: event, data: (data===undefined? null : data) };
+    try{
+      if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler){
+        window.flutter_inappwebview.callHandler('flutterChannel', msg);
+      }
+    }catch(e){}
+    try{ if (window.GameReels && window.GameReels.post) window.GameReels.post(event, msg.data); }catch(e){}
+    try{ if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.gamereels)
+           window.webkit.messageHandlers.gamereels.postMessage(msg); }catch(e){}
+    try{ if (window.parent && window.parent!==window) window.parent.postMessage(msg,'*'); }catch(e){}
+  }
+
+  // Haptic delegation — multi-path. iOS web has no navigator.vibrate (real app vibrates via signal).
+  function vibrate(signal){
+    var msg = { event: signal, data: null };
+    try{
+      if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler)
+        window.flutter_inappwebview.callHandler('flutterChannel', msg);
+    }catch(e){}
+    try{ if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.haptic)
+           window.webkit.messageHandlers.haptic.postMessage(signal); }catch(e){}
+    try{
+      if (navigator.vibrate){
+        var ms = signal==='MediumVibrate'?22 : signal==='LightVibrate'?12 : 8;
+        navigator.vibrate(ms);
+      }
+    }catch(e){}
+  }
+
+  window.__GR = {
+    reels: REELS, dev: DEV, from: FROM, to: TO, active: true,
+    post: postMsg, vibrate: vibrate
+  };
+  // GameReels.post fallback object (so postMsg's own fallback works if host supplies it later)
+  if (!window.GameReels) window.GameReels = { post: function(ev,d){ postMsg(ev,d); } };
+})();
+</script>
+
+<script>
+/* =================================================================
+   GOODS SORT engine — data-driven match-3 "sort into cubbies".
+   ================================================================= */
+(function(){
+  'use strict';
+  var GR = window.__GR;
+
+  // ---------- runtime config (from URL via __GR) ----------
+  var REELS = GR.reels, DEV = GR.dev;
+  var startLevel = GR.from;            // 1-based
+  var stopLevel  = GR.to;              // 1-based or null
+
+  if (REELS) document.body.classList.add('reels');
+  if (DEV) document.getElementById('devnav').classList.add('on');
+
+  // GameEnd emission policy (single source of truth)
+  function shouldEmitGameEnd(level){
+    if (!REELS) return true;                 // non-reels: every level
+    if (stopLevel && level === stopLevel) return true;  // segment end
+    return (level % 30) === 0;               // reels: 30-multiples only
+  }
+
+  // ---------- haptics (CORE-GATED only) ----------
+  function haptic(kind){
+    // kind: 'place' (drop/place) -> Light | 'clear' (cubby clear) -> Medium | 'btn' -> Soft
+    var sig = kind==='clear' ? 'MediumVibrate'
+            : kind==='place' ? 'LightVibrate'
+            : kind==='btn'   ? 'SoftVibrate' : null;
+    if (!sig) return;                         // anything else = not core -> no vibration
+    try{ GR.vibrate(sig); }catch(e){}
+  }
+
+  // =============================================================
+  // STAGE LOADING (data-driven)
+  // =============================================================
+  // Embedded copy of stage1.json so the single HTML is self-contained.
+  // (Build pipeline / editor can overwrite window.__STAGES; we prefer that.)
+  var EMBEDDED_STAGES = {
+    1: {
+      "level": 1, "timeLimit": 120, "cols": 3, "rows": 3, "cellCap": 3,
+      "goods": ["cola","juice","milk","chips","donut"],
+      "combo": { "resetAfterMs": 4000 },
+      "scoring": { "starsPerSort": 1, "comboBonus": 1 },
+      "cubbies": [
+        { "r":0,"c":0,"items":["cola","juice","milk"] },
+        { "r":0,"c":1,"items":["chips","donut","cola"] },
+        { "r":0,"c":2,"items":["juice","milk","chips"] },
+        { "r":1,"c":0,"items":["donut","cola","juice"] },
+        { "r":1,"c":1,"items":["milk","chips","donut"] },
+        { "r":1,"c":2,"items":[] },
+        { "r":2,"c":0,"items":[] },
+        { "r":2,"c":1,"items":[] },
+        { "r":2,"c":2,"items":[] }
+      ]
+    }
+  };
+  function loadStage(level){
+    var src = (window.__STAGES && window.__STAGES[level]) || EMBEDDED_STAGES[level] || EMBEDDED_STAGES[1];
+    // deep clone so replays start fresh
+    return JSON.parse(JSON.stringify(src));
+  }
+
+  // asset path resolver (relative — zippable for host)
+  function tileURL(type){ return '../assets/goods/' + type + '_tile.png'; }
+
+  // =============================================================
+  // STATE
+  // =============================================================
+  var S = {
+    level: startLevel,
+    cfg: null,
+    cubbies: [],        // [{r,c,items:[type...]}]
+    cap: 3,
+    timeLeft: 0,
+    running: false,
+    paused: false,
+    over: false,
+    stars: 0,
+    combo: 1,
+    comboTimer: null,
+    lastTick: 0
+  };
+
+  // DOM refs
+  var shelfEl = document.getElementById('shelf');
+  var lvNumEl = document.getElementById('lvNum');
+  var timerEl = document.getElementById('timer');
+  var starNumEl = document.getElementById('starNum');
+  var comboEl = document.getElementById('combo');
+  var fxEl = document.getElementById('fx');
+  var ghostEl = document.getElementById('drag-ghost');
+  var starsChip = document.getElementById('stars');
+
+  // =============================================================
+  // BUILD BOARD from data
+  // =============================================================
+  function buildBoard(){
+    var cfg = S.cfg;
+    S.cap = cfg.cellCap || 3;
+    shelfEl.style.gridTemplateColumns = 'repeat(' + cfg.cols + ', 1fr)';
+    shelfEl.style.gridTemplateRows = 'repeat(' + cfg.rows + ', 1fr)';
+    shelfEl.innerHTML = '';
+    // order cubbies row-major so grid placement matches r,c
+    var byRC = {};
+    S.cubbies.forEach(function(cb){ byRC[cb.r+'_'+cb.c] = cb; });
+    for (var r=0; r<cfg.rows; r++){
+      for (var c=0; c<cfg.cols; c++){
+        var cb = byRC[r+'_'+c];
+        var el = document.createElement('div');
+        el.className = 'cubby';
+        el.dataset.idx = cb ? S.cubbies.indexOf(cb) : -1;
+        if (cb){ cb.el = el; }
+        shelfEl.appendChild(el);
+      }
+    }
+    renderAllCubbies();
+  }
+
+  function renderCubby(cb){
+    var el = cb.el; if (!el) return;
+    el.innerHTML = '';
+    for (var i=0; i<cb.items.length; i++){
+      var g = document.createElement('div');
+      g.className = 'good';
+      g.style.backgroundImage = 'url("' + tileURL(cb.items[i]) + '")';
+      g.dataset.type = cb.items[i];
+      g.dataset.cubby = S.cubbies.indexOf(cb);
+      g.dataset.slot = i;
+      el.appendChild(g);
+    }
+  }
+  function renderAllCubbies(){ S.cubbies.forEach(renderCubby); }
+
+  // =============================================================
+  // RULES
+  // =============================================================
+  function topGoodEl(cb){
+    // the rightmost good is the "movable" one (left-aligned fill)
+    var els = cb.el ? cb.el.querySelectorAll('.good') : [];
+    return els.length ? els[els.length-1] : null;
+  }
+  function canDrop(fromCb, toCb, type){
+    if (fromCb === toCb) return false;
+    if (toCb.items.length >= S.cap) return false;       // full
+    if (toCb.items.length === 0) return true;           // empty -> ok
+    return toCb.items[0] === type;                      // same type only
+  }
+
+  // perform a move (data + render) ; returns true if cleared
+  function doMove(fromIdx, toIdx){
+    var fromCb = S.cubbies[fromIdx], toCb = S.cubbies[toIdx];
+    if (!fromCb || !toCb) return false;
+    if (!fromCb.items.length) return false;
+    var type = fromCb.items[fromCb.items.length-1];
+    if (!canDrop(fromCb, toCb, type)) return false;
+
+    fromCb.items.pop();
+    toCb.items.push(type);
+    renderCubby(fromCb);
+    renderCubby(toCb);
+
+    // squash-bounce on the landed good (last one in target)
+    var landed = toCb.el ? toCb.el.querySelectorAll('.good') : [];
+    if (landed.length){
+      var lg = landed[landed.length-1];
+      lg.classList.add('land');
+      lg.addEventListener('animationend', function(){ lg.classList.remove('land'); }, { once:true });
+    }
+    haptic('place');
+
+    // check clear: cap identical
+    if (toCb.items.length === S.cap && allSame(toCb.items)){
+      clearCubby(toCb);
+      return true;
+    }
+    return false;
+  }
+  function allSame(arr){ for (var i=1;i<arr.length;i++){ if(arr[i]!==arr[0]) return false; } return arr.length>0; }
+
+  // =============================================================
+  // CLEAR + EFFECTS (star fly, praise, combo, pop)
+  // =============================================================
+  function clearCubby(cb){
+    var el = cb.el;
+    var rect = el ? el.getBoundingClientRect() : {left:0,top:0,width:0,height:0};
+    var cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+
+    // combo bump
+    bumpCombo();
+    var combo = S.combo;
+
+    // 1) STAR FLY  (counter += base * combo)
+    var base = (S.cfg.scoring && S.cfg.scoring.starsPerSort) || 1;
+    var gain = base * combo;
+    flyStar(cx, cy, gain);
+
+    // 2) PRAISE TEXT + sparkle ring
+    praise(cx, cy, combo);
+    sparkleRing(cx, cy);
+
+    // 4) cubby pop
+    if (el){
+      el.classList.add('clearing');
+      el.addEventListener('animationend', function(){ el.classList.remove('clearing'); }, { once:true });
+    }
+    haptic('clear');
+
+    // remove items (data) — visual goods vanish with a quick pop
+    if (el){
+      var goods = el.querySelectorAll('.good');
+      goods.forEach(function(g){
+        g.style.transition = 'transform .22s ease, opacity .22s ease';
+        g.style.transform = 'scale(.2) translateY(-30%)';
+        g.style.opacity = '0';
+      });
+    }
+    cb.items = [];
+    setTimeout(function(){ renderCubby(cb); checkWin(); }, 200);
+  }
+
+  // combo logic ----------------------------------------------
+  function bumpCombo(){
+    S.combo += 1;
+    showCombo();
+    if (S.comboTimer) clearTimeout(S.comboTimer);
+    var ms = (S.cfg.combo && S.cfg.combo.resetAfterMs) || 4000;
+    S.comboTimer = setTimeout(resetCombo, ms);
+  }
+  function resetCombo(){
+    S.combo = 1;
+    comboEl.classList.remove('show');
+  }
+  function showCombo(){
+    comboEl.textContent = '굿즈 x' + S.combo;
+    comboEl.classList.add('show');
+    comboEl.classList.remove('bump'); void comboEl.offsetWidth; comboEl.classList.add('bump');
+  }
+
+  // star fly -------------------------------------------------
+  function flyStar(x, y, gain){
+    var target = starsChip.getBoundingClientRect();
+    var tx = target.left + target.width*0.32, ty = target.top + target.height/2;
+    var st = document.createElement('div'); st.className='fly-star';
+    st.style.left = x+'px'; st.style.top = y+'px';
+    st.style.transform = 'translate(-50%,-50%) scale(1)';
+    document.body.appendChild(st);
+    // burst then fly
+    requestAnimationFrame(function(){
+      st.style.transition = 'left .55s cubic-bezier(.5,-0.3,.3,1), top .55s cubic-bezier(.5,-0.3,.3,1), transform .55s ease, opacity .55s ease';
+      st.style.left = tx+'px'; st.style.top = ty+'px';
+      st.style.transform = 'translate(-50%,-50%) scale(.5)';
+    });
+    setTimeout(function(){
+      st.remove();
+      S.stars += gain;
+      starNumEl.textContent = S.stars;
+      // counter pop
+      starsChip.style.transition='transform .15s'; starsChip.style.transform='scale(1.25)';
+      setTimeout(function(){ starsChip.style.transform='scale(1)'; }, 150);
+    }, 560);
+  }
+
+  // praise text ----------------------------------------------
+  function praiseTier(combo){
+    if (combo >= 8) return { txt:'Perfect!', cls:'tperf' };
+    if (combo >= 5) return { txt:'훌륭해요!', cls:'t5' };
+    if (combo >= 3) return { txt:'멋져요!', cls:'t3' };
+    return { txt:'좋아요!', cls:'' };
+  }
+  function praise(x, y, combo){
+    var t = praiseTier(combo);
+    var p = document.createElement('div');
+    p.className = 'praise ' + t.cls;
+    p.textContent = t.txt;
+    p.style.left = x+'px'; p.style.top = y+'px';
+    p.style.animation = 'praisePop 1.0s ease forwards';
+    fxEl.appendChild(p);
+    setTimeout(function(){ p.remove(); }, 1050);
+  }
+  function sparkleRing(x, y){
+    var ring = document.createElement('div'); ring.className='spark-ring';
+    ring.style.left=x+'px'; ring.style.top=y+'px';
+    ring.style.animation='ring .55s ease-out forwards';
+    fxEl.appendChild(ring);
+    setTimeout(function(){ ring.remove(); }, 560);
+    // a few sparkles
+    for (var i=0;i<7;i++){
+      (function(i){
+        var s = document.createElement('div'); s.className='sparkle';
+        s.style.left=x+'px'; s.style.top=y+'px';
+        fxEl.appendChild(s);
+        var ang = (Math.PI*2)*(i/7) + Math.random()*0.6;
+        var dist = 40 + Math.random()*36;
+        requestAnimationFrame(function(){
+          s.style.transition='transform .5s ease-out, opacity .5s ease-out';
+          s.style.transform='translate('+Math.cos(ang)*dist+'px,'+Math.sin(ang)*dist+'px) scale(.2)';
+          s.style.opacity='0';
+        });
+        setTimeout(function(){ s.remove(); }, 520);
+      })(i);
+    }
+  }
+
+  // =============================================================
+  // DRAG-TO-SORT input (touch + mouse)
+  // =============================================================
+  var drag = null; // {type, fromIdx, ghostSize}
+  function cubbyElFromPoint(clientX, clientY){
+    var els = document.elementsFromPoint(clientX, clientY);
+    for (var i=0;i<els.length;i++){
+      var e = els[i];
+      if (e.classList && e.classList.contains('cubby')) return e;
+    }
+    return null;
+  }
+  function startDrag(goodEl, clientX, clientY){
+    if (!S.running || S.paused || S.over) return;
+    var cb = S.cubbies[+goodEl.dataset.cubby];
+    if (!cb) return;
+    // only the rightmost (top) good is draggable
+    var top = topGoodEl(cb);
+    if (top !== goodEl) goodEl = top;
+    if (!goodEl) return;
+
+    var rect = goodEl.getBoundingClientRect();
+    drag = { type: goodEl.dataset.type, fromIdx: +goodEl.dataset.cubby, el: goodEl, size: rect.width };
+    goodEl.classList.add('dragging');
+    ghostEl.style.display='block';
+    ghostEl.style.width = rect.width+'px';
+    ghostEl.style.height = rect.height+'px';
+    ghostEl.style.backgroundImage = 'url("' + tileURL(drag.type) + '")';
+    moveGhost(clientX, clientY);
+  }
+  function moveGhost(clientX, clientY){
+    ghostEl.style.left = clientX+'px';
+    ghostEl.style.top  = clientY+'px';
+    // highlight target
+    clearTargetHL();
+    var tEl = cubbyElFromPoint(clientX, clientY);
+    if (tEl){
+      var tIdx = +tEl.dataset.idx;
+      var toCb = S.cubbies[tIdx];
+      if (toCb && tIdx !== drag.fromIdx){
+        tEl.classList.add(canDrop(S.cubbies[drag.fromIdx], toCb, drag.type) ? 'target-ok' : 'target-bad');
+      }
+    }
+  }
+  function clearTargetHL(){
+    var hs = shelfEl.querySelectorAll('.target-ok,.target-bad');
+    hs.forEach(function(h){ h.classList.remove('target-ok','target-bad'); });
+  }
+  function endDrag(clientX, clientY){
+    if (!drag) return;
+    clearTargetHL();
+    ghostEl.style.display='none';
+    if (drag.el) drag.el.classList.remove('dragging');
+    var tEl = cubbyElFromPoint(clientX, clientY);
+    var done = false;
+    if (tEl){
+      var tIdx = +tEl.dataset.idx;
+      done = doMove(drag.fromIdx, tIdx);
+    }
+    // if move didn't happen, re-render source to restore the (hidden) good
+    if (!done){
+      renderCubby(S.cubbies[drag.fromIdx]);
+    }
+    drag = null;
+  }
+
+  // pointer handlers
+  function onDown(ev){
+    if (S.paused || S.over) return;
+    var t = ev.target;
+    if (t && t.classList && t.classList.contains('good')){
+      var p = pt(ev);
+      startDrag(t, p.x, p.y);
+      ev.preventDefault();
+    }
+  }
+  function onMove(ev){ if (drag){ var p=pt(ev); moveGhost(p.x,p.y); ev.preventDefault(); } }
+  function onUp(ev){ if (drag){ var p=pt(ev); endDrag(p.x,p.y); ev.preventDefault(); } }
+  function pt(ev){
+    if (ev.touches && ev.touches.length) return { x:ev.touches[0].clientX, y:ev.touches[0].clientY };
+    if (ev.changedTouches && ev.changedTouches.length) return { x:ev.changedTouches[0].clientX, y:ev.changedTouches[0].clientY };
+    return { x:ev.clientX, y:ev.clientY };
+  }
+  shelfEl.addEventListener('pointerdown', onDown, { passive:false });
+  window.addEventListener('pointermove', onMove, { passive:false });
+  window.addEventListener('pointerup', onUp, { passive:false });
+  window.addEventListener('pointercancel', onUp, { passive:false });
+
+  // =============================================================
+  // TIMER + WIN/LOSE
+  // =============================================================
+  function fmt(sec){
+    sec = Math.max(0, Math.ceil(sec));
+    var m = Math.floor(sec/60), s = sec%60;
+    return (m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  }
+  function tick(now){
+    if (!S.running){ S.lastTick = now; return; }
+    if (!S.paused && !S.over){
+      var dt = (now - S.lastTick)/1000;
+      S.lastTick = now;
+      S.timeLeft -= dt;
+      if (S.timeLeft <= 0){ S.timeLeft = 0; updateTimer(); lose(); }
+      else updateTimer();
+    } else {
+      S.lastTick = now;
+    }
+    requestAnimationFrame(tick);
+  }
+  function updateTimer(){
+    timerEl.textContent = fmt(S.timeLeft);
+    if (S.timeLeft < 30) timerEl.classList.add('warn'); else timerEl.classList.remove('warn');
+  }
+
+  function totalGoods(){ var n=0; S.cubbies.forEach(function(cb){ n+=cb.items.length; }); return n; }
+  function checkWin(){
+    if (S.over) return;
+    if (totalGoods() === 0){ win(); }
+  }
+  function win(){
+    if (S.over) return;
+    S.over = true; S.running = false;
+    if (S.comboTimer) clearTimeout(S.comboTimer);
+    if (shouldEmitGameEnd(S.level)){
+      GR.post('GameEnd', { success:true, progressIndex:S.level, currentIndex:S.level });
+    }
+    setTimeout(function(){ showWinPopup(); }, 480);
+  }
+  function lose(){
+    if (S.over) return;
+    S.over = true; S.running = false;
+    if (S.comboTimer) clearTimeout(S.comboTimer);
+    if (shouldEmitGameEnd(S.level)){
+      GR.post('GameEnd', { success:false, progressIndex:S.level, currentIndex:S.level });
+    }
+    showLosePopup();
+  }
+
+  // =============================================================
+  // RESULT POPUPS
+  // =============================================================
+  var overlay = document.getElementById('overlay');
+  var popupBox = document.getElementById('popupBox');
+  function starRating(){
+    // simple star rating by time remaining ratio
+    var ratio = S.timeLeft / (S.cfg.timeLimit || 1);
+    if (ratio > 0.6) return 3;
+    if (ratio > 0.3) return 2;
+    return 1;
+  }
+  function showWinPopup(){
+    var rating = starRating();
+    var srow = '';
+    for (var i=0;i<3;i++) srow += (i<rating ? '⭐' : '☆');
+    document.body.classList.add('dim');
+    popupBox.innerHTML =
+      '<h2>클리어!</h2>' +
+      '<div class="sub">성공! 모든 굿즈를 정리했어요</div>' +
+      '<div class="pstars">'+srow+'</div>' +
+      '<div class="sub">획득 별 '+S.stars+'개</div>' +
+      '<div class="btn next" id="nextBtn">다음 ▶</div>';
+    overlay.classList.add('on');
+    document.getElementById('nextBtn').addEventListener('click', function(){
+      haptic('btn'); nextLevel();
+    });
+  }
+  function showLosePopup(){
+    document.body.classList.add('dim');
+    popupBox.innerHTML =
+      '<h2>시간 초과</h2>' +
+      '<div class="sub">아쉬워요! 시간이 다 됐어요</div>' +
+      '<div class="pstars">⏰</div>' +
+      '<div class="btn retry" id="retryBtn">다시하기</div>';
+    overlay.classList.add('on');
+    document.getElementById('retryBtn').addEventListener('click', function(){
+      haptic('btn'); retryLevel();
+    });
+  }
+  function closePopup(){ overlay.classList.remove('on'); document.body.classList.remove('dim'); }
+
+  function nextLevel(){
+    closePopup();
+    if (stopLevel && S.level >= stopLevel){ return; } // segment end: stop
+    S.level += 1;
+    startLevelFn(S.level);
+  }
+  function retryLevel(){ closePopup(); startLevelFn(S.level); }
+
+  // =============================================================
+  // LEVEL LIFECYCLE
+  // =============================================================
+  function startLevelFn(level){
+    S.level = level;
+    S.cfg = loadStage(level);
+    S.cubbies = S.cfg.cubbies.map(function(cb){ return { r:cb.r, c:cb.c, items:cb.items.slice(), el:null }; });
+    S.cap = S.cfg.cellCap || 3;
+    S.timeLeft = S.cfg.timeLimit || 120;
+    S.stars = 0; S.combo = 1; S.over = false; S.paused = false; S.running = true;
+    if (S.comboTimer) clearTimeout(S.comboTimer);
+    lvNumEl.textContent = level;
+    starNumEl.textContent = '0';
+    comboEl.classList.remove('show');
+    closePopup();
+    buildBoard();
+    updateTimer();
+  }
+
+  // =============================================================
+  // PAUSE / HOST CONTROL
+  // =============================================================
+  var pauseScreen = document.getElementById('pauseScreen');
+  function pauseGame(showUI){
+    if (S.over) return;
+    S.paused = true;
+    if (showUI) pauseScreen.classList.add('on');
+  }
+  function resumeGame(){
+    S.paused = false;
+    pauseScreen.classList.remove('on');
+    S.lastTick = performance.now();
+  }
+  document.getElementById('pause').addEventListener('click', function(){ haptic('btn'); pauseGame(true); });
+  document.getElementById('resumeBtn').addEventListener('click', function(){ haptic('btn'); resumeGame(); });
+
+  // host -> game
+  function handleHostMsg(payload){
+    var ev = payload && payload.event;
+    if (ev === 'GamePause') pauseGame(false);
+    else if (ev === 'GameResume') resumeGame();
+  }
+  window.OnMessageFromFlutter = function(payload){ handleHostMsg(payload); };
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if (d && typeof d === 'object' && d.event) handleHostMsg(d);
+  });
+
+  // dev nav
+  document.getElementById('devPrev').addEventListener('click', function(){
+    if (S.level>1){ S.level--; startLevelFn(S.level); }
+  });
+  document.getElementById('devNext').addEventListener('click', function(){
+    S.level++; startLevelFn(S.level);
+  });
+
+  // =============================================================
+  // GAMESTART (idempotent re-emit) + BOOT
+  // =============================================================
+  var gameStartSent = false;
+  function emitGameStart(){
+    GR.post('GameStart', null);
+    gameStartSent = true;
+  }
+  [0,300,800,1600,3000,5000].forEach(function(ms){
+    setTimeout(emitGameStart, ms);
+  });
+
+  // boot
+  startLevelFn(startLevel);
+  requestAnimationFrame(function(t){ S.lastTick = t; requestAnimationFrame(tick); });
+
+  // =============================================================
+  // TEST HOOKS (for headless verify)
+  // =============================================================
+  window.__qa = {
+    state: function(){ return {
+      level:S.level, timeLeft:S.timeLeft, stars:S.stars, combo:S.combo,
+      over:S.over, running:S.running, paused:S.paused, reels:REELS,
+      total: totalGoods()
+    }; },
+    board: function(){ return S.cubbies.map(function(cb){ return { r:cb.r, c:cb.c, items:cb.items.slice() }; }); },
+    // drive a move deterministically (returns true if a cubby cleared)
+    move: function(fromIdx, toIdx){ return doMove(fromIdx, toIdx); },
+    stars: function(){ return S.stars; },
+    combo: function(){ return S.combo; },
+    timeLeft: function(){ return S.timeLeft; },
+    setTime: function(t){ S.timeLeft = t; updateTimer(); },
+    forceLose: function(){ S.timeLeft = 0; lose(); },
+    shouldEmitGameEnd: shouldEmitGameEnd,
+    safeTop: function(){ return getComputedStyle(document.documentElement).getPropertyValue('--safe-top').trim(); },
+    win: function(){ win(); },
+    // find a sequence of moves to win, then execute (greedy solver for verify)
+    autoSolve: function(maxSteps){
+      maxSteps = maxSteps || 200;
+      var steps = 0;
+      function findMove(){
+        // 1) try to complete: move a good onto a cubby that has 2 of same type
+        for (var t=0;t<S.cubbies.length;t++){
+          var to = S.cubbies[t];
+          if (to.items.length>0 && to.items.length<S.cap && allSame(to.items)){
+            for (var f=0;f<S.cubbies.length;f++){
+              if (f===t) continue;
+              var fr = S.cubbies[f];
+              if (fr.items.length && fr.items[fr.items.length-1]===to.items[0] && canDrop(fr,to,to.items[0]))
+                return [f,t];
+            }
+          }
+        }
+        // 2) consolidate: move a top good onto a cubby (empty or same) to gather
+        for (var f2=0;f2<S.cubbies.length;f2++){
+          var fr2 = S.cubbies[f2]; if(!fr2.items.length) continue;
+          var typ = fr2.items[fr2.items.length-1];
+          // prefer a target already holding same type (not full)
+          var bestEmpty=-1;
+          for (var t2=0;t2<S.cubbies.length;t2++){
+            if (t2===f2) continue;
+            var to2=S.cubbies[t2];
+            if (to2.items.length && to2.items.length<S.cap && to2.items[0]===typ && allSame(to2.items)) return [f2,t2];
+            if (to2.items.length===0 && bestEmpty<0) bestEmpty=t2;
+          }
+          // spread to empty only if source is mixed (avoid loops)
+          if (bestEmpty>=0 && !allSame(fr2.items)) return [f2,bestEmpty];
+        }
+        return null;
+      }
+      while (steps<maxSteps && totalGoods()>0){
+        var mv = findMove();
+        if (!mv) break;
+        doMove(mv[0], mv[1]);
+        steps++;
+      }
+      return { steps:steps, remaining:totalGoods(), won:totalGoods()===0 };
+    }
+  };
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
