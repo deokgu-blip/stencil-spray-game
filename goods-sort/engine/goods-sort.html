@@ -84,7 +84,7 @@
   /* stage = the tilt container */
   #shelf{ position:relative; width:min(92vw, 62vh, 480px); aspect-ratio:1/1.02;
     transform-style:preserve-3d;
-    transform: rotateX(15deg);
+    transform: rotateX(6deg);
     filter: drop-shadow(0 22px 26px rgba(0,0,0,.5)); }
   /* outer wooden frame (the board face the cubbies are carved into) */
   #shelf .frame{ position:absolute; inset:0;
@@ -135,8 +135,8 @@
       radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.20), rgba(0,0,0,0) 55%),
       linear-gradient(180deg, #ecd6ab 0%, #e3c690 60%, #d2ad6f 100%);
     box-shadow: inset 0 7px 12px rgba(0,0,0,.30), inset 0 -3px 6px rgba(255,255,255,.30);
-    display:flex; align-items:flex-end; justify-content:flex-start;
-    padding:0 5% 7%; gap:3.5%;
+    display:flex; align-items:flex-end; justify-content:center;
+    padding:0 4% 6%; gap:2.5%;
     transition: box-shadow .12s, background .12s; }
   .cubby.target-ok .c-floor{ box-shadow: inset 0 0 0 3px #5fd06b, inset 0 7px 12px rgba(0,0,0,.28);
     background:linear-gradient(180deg,#d6f0d2,#e3c690); }
@@ -146,22 +146,22 @@
   /* good sprite stands inside the cubby. The shelf is tilted rotateX(15deg);
      we counter-rotate each good (-15deg) about its base so it reads UPRIGHT
      (billboarded) while still living on the recessed floor. */
-  .good{ position:relative; width:30%; aspect-ratio:1/1;
+  .good{ position:relative; width:30%; height:76%;
     background-size:contain; background-repeat:no-repeat; background-position:center bottom;
     filter:drop-shadow(0 5px 4px rgba(0,0,0,.34));
-    transform: translateZ(10px) rotateX(-15deg);
+    transform: translateZ(10px) rotateX(-6deg) scale(var(--gs,1));
     will-change:transform; transform-origin:center bottom;
     cursor:grab; touch-action:none; }
   /* a blocked (non-front) good is visibly inert */
   .good.blocked{ cursor:default; filter:drop-shadow(0 3px 3px rgba(0,0,0,.3)) brightness(.9);
-    transform: translateZ(6px) rotateX(-15deg); }
+    transform: translateZ(6px) rotateX(-6deg); }
   .good.dragging{ opacity:0; }
   .good.land{ animation:land .34s cubic-bezier(.34,1.56,.64,1); }
   @keyframes land{
-    0%{ transform:translateZ(10px) rotateX(-15deg) translateY(-26%) scaleY(1.18) scaleX(.86); }
-    45%{ transform:translateZ(10px) rotateX(-15deg) translateY(0) scaleY(.78) scaleX(1.16); }
-    70%{ transform:translateZ(10px) rotateX(-15deg) translateY(0) scaleY(1.08) scaleX(.94); }
-    100%{ transform:translateZ(10px) rotateX(-15deg) translateY(0) scaleY(1) scaleX(1); }
+    0%{ transform:translateZ(10px) rotateX(-6deg) translateY(-26%) scaleY(1.18) scaleX(.86); }
+    45%{ transform:translateZ(10px) rotateX(-6deg) translateY(0) scaleY(.78) scaleX(1.16); }
+    70%{ transform:translateZ(10px) rotateX(-6deg) translateY(0) scaleY(1.08) scaleX(.94); }
+    100%{ transform:translateZ(10px) rotateX(-6deg) translateY(0) scaleY(1) scaleX(1); }
   }
   /* drag avatar (floats above board) */
   #drag-ghost{ position:fixed; z-index:60; pointer-events:none; display:none;
@@ -417,6 +417,8 @@
 
   // asset path resolver (relative — zippable for host)
   function tileURL(type){ return '../assets/goods/' + type + '_tile.png'; }
+  // per-type display scale so goods read at consistent real-world sizes (bottle bigger than donut)
+  var GOOD_SCALE = { cola:1.0, juice:1.0, milk:0.96, chips:0.82, donut:0.64 };
 
   // =============================================================
   // STATE
@@ -491,6 +493,7 @@
       g.className = 'good';
       g.style.backgroundImage = 'url("' + tileURL(cb.items[i]) + '")';
       g.dataset.type = cb.items[i];
+      g.style.setProperty('--gs', GOOD_SCALE[cb.items[i]] || 1);
       g.dataset.cubby = idx;
       g.dataset.slot = i;
       // GRAB RULE: only the front-most (rightmost) good is grabbable;
